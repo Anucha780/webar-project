@@ -110,7 +110,7 @@ let lastFrameTimestamp =
 
 
 /* =========================================================
-   THREE.JS
+   THREE
 ========================================================= */
 
 let scene =
@@ -144,54 +144,18 @@ const MODEL_PATH =
 
 
 /*
-  ขนาด character เทียบกับคน
-
-  ใหญ่เกิน -> ลด
-  เล็กเกิน -> เพิ่ม
+  ขนาดพื้นฐานของโมเดลเทียบกับตัวคน
 */
 
 const MODEL_SCALE_MULTIPLIER =
-  1.8;
+  1.35;
 
 
 /*
-  Character จะอยู่ด้านไหนของคน
+  Local rotation ของ GLB
 
-  "right" = ด้านขวาของหน้าจอ
-  "left"  = ด้านซ้ายของหน้าจอ
-*/
-
-const CHARACTER_SIDE =
-  "right";
-
-
-/*
-  ระยะห่างจากคน
-
-  ค่านี้อิงกับ shoulder width
-  ไม่ใช่ pixel ตายตัว
-*/
-
-const SIDE_DISTANCE =
-  1.25;
-
-
-/*
-  Y Offset
-
-  positive = ขึ้น
-  negative = ลง
-*/
-
-const MODEL_OFFSET_Y =
-  -0.03;
-
-
-/*
-  Rotation ของ GLB เอง
-
-  ถ้าตัวละครหันผิดด้าน
-  ค่อยจูนค่าตรงนี้ภายหลัง
+  ถ้าโมเดลหันผิดด้าน
+  ค่อยจูนเฉพาะ 3 ค่านี้
 */
 
 const MODEL_ROTATION_X =
@@ -205,13 +169,84 @@ const MODEL_ROTATION_Z =
 
 
 /* =========================================================
+   ORBIT CONFIG
+========================================================= */
+
+/*
+  ความเร็วในการบินวน
+
+  หน่วย = radians / second
+
+  1.6 ≈ 1 รอบทุก 3.9 วินาที
+*/
+
+const ORBIT_SPEED =
+  1.6;
+
+
+/*
+  ความกว้างของวงโคจร
+
+  ค่านี้คูณกับ shoulder width
+
+  1.0 = ประมาณความกว้างไหล่
+  1.5 = กว้างขึ้น
+*/
+
+const ORBIT_RADIUS_X =
+  1.35;
+
+
+/*
+  การขึ้นลงระหว่างบิน
+*/
+
+const ORBIT_RADIUS_Y =
+  0.38;
+
+
+/*
+  ยกจุดศูนย์กลางวงโคจรขึ้นจาก
+  torso center เล็กน้อย
+
+  0 = กลาง torso
+  positive = สูงขึ้น
+*/
+
+const ORBIT_CENTER_Y =
+  0.12;
+
+
+/*
+  จำลองการบินมาด้านหน้า/ด้านหลัง
+
+  0.25 หมายถึง scale จะเปลี่ยน
+  ประมาณ ±25%
+*/
+
+const ORBIT_DEPTH_SCALE =
+  0.25;
+
+
+/*
+  ให้โมเดลหันตามทิศทางการบิน
+*/
+
+const FOLLOW_ORBIT_DIRECTION =
+  true;
+
+
+/* =========================================================
    SMOOTHING
 ========================================================= */
 
 const POSITION_SMOOTHING =
-  10;
+  12;
 
 const SCALE_SMOOTHING =
+  9;
+
+const ROTATION_SMOOTHING =
   8;
 
 const MIN_VISIBILITY =
@@ -229,6 +264,45 @@ const LANDMARK = {
 
   LEFT_HIP: 23,
   RIGHT_HIP: 24
+};
+
+
+/* =========================================================
+   ORBIT STATE
+========================================================= */
+
+/*
+  มุมปัจจุบันของวงโคจร
+*/
+
+let orbitAngle =
+  0;
+
+
+/*
+  Body data ล่าสุดที่เชื่อถือได้
+
+  Orbit จะใช้ข้อมูลชุดนี้ทุก animation frame
+  ทำให้การบินไม่หยุดเป็นช่วง ๆ ตาม FPS
+  ของ MediaPipe
+*/
+
+const trackedBody = {
+
+  valid:
+    false,
+
+  centerX:
+    0.5,
+
+  centerY:
+    0.5,
+
+  shoulderWidth:
+    0.2,
+
+  torsoHeight:
+    0.2
 };
 
 
@@ -260,7 +334,7 @@ function setError(error) {
 
 
 /* =========================================================
-   SMOOTHING
+   DAMPING
 ========================================================= */
 
 function damp(
@@ -276,6 +350,7 @@ function damp(
       -smoothing * delta
     );
 
+
   return THREE.MathUtils.lerp(
     current,
     target,
@@ -285,7 +360,55 @@ function damp(
 
 
 /* =========================================================
-   THREE
+   ANGLE DAMPING
+========================================================= */
+
+function dampAngle(
+  current,
+  target,
+  smoothing,
+  delta
+) {
+
+  let difference =
+    target -
+    current;
+
+
+  while (
+    difference > Math.PI
+  ) {
+
+    difference -=
+      Math.PI * 2;
+  }
+
+
+  while (
+    difference < -Math.PI
+  ) {
+
+    difference +=
+      Math.PI * 2;
+  }
+
+
+  const factor =
+    1 -
+    Math.exp(
+      -smoothing * delta
+    );
+
+
+  return (
+    current +
+    difference * factor
+  );
+}
+
+
+/* =========================================================
+   THREE INITIALIZATION
 ========================================================= */
 
 function initializeThree() {
@@ -303,8 +426,8 @@ function initializeThree() {
     /*
       Screen-space coordinate system
 
-      x = 0 → 1
-      y = 0 → 1
+      X 0 → 1
+      Y 0 → 1
     */
 
     threeCamera =
@@ -420,7 +543,6 @@ function initializeThree() {
     threeStatus.textContent =
       `Ready r${THREE.REVISION}`;
 
-
   } catch (error) {
 
     threeStatus.textContent =
@@ -438,7 +560,7 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB LOAD + VALIDATE
+   GLB LOAD + VALIDATION
 ========================================================= */
 
 function loadGLB() {
@@ -470,6 +592,10 @@ function loadGLB() {
           );
         }
 
+
+        /* ---------------------------------
+           Mesh / material inspection
+        --------------------------------- */
 
         let meshCount =
           0;
@@ -664,7 +790,7 @@ function loadGLB() {
 
 
         /* ---------------------------------
-           Inspect animations FIRST
+           Animation inspection
         --------------------------------- */
 
         const animations =
@@ -698,12 +824,11 @@ function loadGLB() {
 
 
         /*
-          Important:
+          หลัง inspect แล้วเท่านั้น
+          จึงเลือก clip จริง
 
-          เราไม่ guess ชื่อ animation
-
-          หลังจาก inspect gltf.animations แล้ว
-          ถ้ามี clip จริง จึงใช้ clip ตัวแรก
+          หากไม่มี animation
+          orbit ยังทำงานได้ตามปกติ
         */
 
         if (
@@ -746,7 +871,7 @@ function loadGLB() {
         } else {
 
           console.log(
-            "[GLB] No animations"
+            "[GLB] No embedded animation"
           );
         }
 
@@ -764,7 +889,7 @@ function loadGLB() {
 
 
         setStatus(
-          "GLB ready — Character Side Mode"
+          "GLB ready — Butterfly Orbit Mode"
         );
 
 
@@ -828,6 +953,11 @@ function loadGLB() {
         new Error(
           "Unable to load GLB"
         )
+      );
+
+
+      setStatus(
+        "GLB load failed"
       );
     }
   );
@@ -924,6 +1054,10 @@ async function initializePose() {
     setStatus(
       "MediaPipe failed"
     );
+
+
+    startButton.disabled =
+      true;
   }
 }
 
@@ -1067,8 +1201,16 @@ async function startCamera() {
       performance.now();
 
 
+    orbitAngle =
+      0;
+
+
+    trackedBody.valid =
+      false;
+
+
     setStatus(
-      "M6.3A Character Side Mode running"
+      "M6.3B Butterfly Orbit running"
     );
 
 
@@ -1097,7 +1239,7 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP
+   STOP / SWITCH
 ========================================================= */
 
 function stopStream() {
@@ -1150,6 +1292,10 @@ function stopStream() {
 
   overlay.style.display =
     "none";
+
+
+  trackedBody.valid =
+    false;
 
 
   if (
@@ -1530,12 +1676,15 @@ function landmarkReliable(
 
 
 /* =========================================================
-   CHARACTER BESIDE PERSON
+   UPDATE BODY DATA
+
+   MediaPipe only updates the body target.
+
+   It does NOT directly move the butterfly.
 ========================================================= */
 
-function updateCharacter(
-  landmarks,
-  delta
+function updateTrackedBody(
+  landmarks
 ) {
 
   const leftShoulder =
@@ -1579,7 +1728,7 @@ function updateCharacter(
 
   if (!reliable) {
 
-    modelAnchor.visible =
+    trackedBody.valid =
       false;
 
 
@@ -1590,10 +1739,6 @@ function updateCharacter(
     return;
   }
 
-
-  /* ---------------------------------
-     Convert landmarks to display
-  --------------------------------- */
 
   const ls =
     landmarkToCanvas(
@@ -1618,10 +1763,6 @@ function updateCharacter(
       rightHip
     );
 
-
-  /* ---------------------------------
-     Body centers
-  --------------------------------- */
 
   const shoulderCenter = {
 
@@ -1657,7 +1798,7 @@ function updateCharacter(
   };
 
 
-  const torsoCenter = {
+  const torsoCanvas = {
 
     x:
       (
@@ -1674,107 +1815,213 @@ function updateCharacter(
   };
 
 
-  /* ---------------------------------
-     Body dimensions
-  --------------------------------- */
-
-  const shoulderWidthPixels =
-    distance2D(
-      ls,
-      rs
-    );
-
-
-  const torsoHeightPixels =
-    distance2D(
-      shoulderCenter,
-      hipCenter
+  const torsoThree =
+    canvasToThree(
+      torsoCanvas
     );
 
 
   const shoulderWidth =
-    shoulderWidthPixels /
+    distance2D(
+      ls,
+      rs
+    ) /
     overlay.width;
 
 
   const torsoHeight =
-    torsoHeightPixels /
+    distance2D(
+      shoulderCenter,
+      hipCenter
+    ) /
     overlay.height;
 
 
-  /* ---------------------------------
-     Character side position
-  --------------------------------- */
+  trackedBody.centerX =
+    torsoThree.x;
 
-  const sideSign =
-    CHARACTER_SIDE === "left"
-      ? -1
-      : 1;
+
+  trackedBody.centerY =
+    torsoThree.y;
+
+
+  trackedBody.shoulderWidth =
+    shoulderWidth;
+
+
+  trackedBody.torsoHeight =
+    torsoHeight;
+
+
+  trackedBody.valid =
+    true;
+}
+
+
+/* =========================================================
+   ORBIT BEHAVIOR
+========================================================= */
+
+function updateOrbit(
+  delta
+) {
+
+  if (
+    !trackedBody.valid
+  ) {
+
+    modelAnchor.visible =
+      false;
+
+    return;
+  }
 
 
   /*
-    Character position in canvas pixels.
-
-    การใช้ shoulderWidth ทำให้ระยะห่างจากคน
-    ขยาย/ย่อตามขนาดคนด้วย
+    Advance orbit.
   */
 
-  const characterCanvas = {
-
-    x:
-      torsoCenter.x +
-      (
-        sideSign *
-        shoulderWidthPixels *
-        SIDE_DISTANCE
-      ),
+  orbitAngle +=
+    ORBIT_SPEED *
+    delta;
 
 
-    y:
-      torsoCenter.y -
-      (
-        MODEL_OFFSET_Y *
-        overlay.height
-      )
-  };
+  if (
+    orbitAngle >
+    Math.PI * 2
+  ) {
+
+    orbitAngle -=
+      Math.PI * 2;
+  }
 
 
-  const characterThree =
-    canvasToThree(
-      characterCanvas
+  /*
+    Horizontal circle component.
+  */
+
+  const orbitX =
+    Math.cos(
+      orbitAngle
     );
 
 
-  /* ---------------------------------
-     Scale
-  --------------------------------- */
+  /*
+    Fake depth component.
+
+    +1 = front
+    -1 = back
+  */
+
+  const orbitDepth =
+    Math.sin(
+      orbitAngle
+    );
+
+
+  /*
+    Small vertical motion.
+
+    ใช้ความถี่ 2 เท่าของวงโคจร
+    เพื่อให้เส้นทางไม่แข็งเป็นวงรีธรรมดา
+  */
+
+  const orbitY =
+    Math.sin(
+      orbitAngle * 2
+    );
+
+
+  /*
+    Radius follows person size.
+  */
+
+  const radiusX =
+    trackedBody.shoulderWidth *
+    ORBIT_RADIUS_X;
+
+
+  const radiusY =
+    trackedBody.torsoHeight *
+    ORBIT_RADIUS_Y;
+
+
+  /*
+    Raise orbit center slightly.
+  */
+
+  const centerYOffset =
+    trackedBody.torsoHeight *
+    ORBIT_CENTER_Y;
+
+
+  const targetX =
+    trackedBody.centerX +
+    orbitX *
+    radiusX;
+
+
+  const targetY =
+    trackedBody.centerY +
+    centerYOffset +
+    orbitY *
+    radiusY;
+
+
+  /*
+    Base model scale from body size.
+  */
 
   const bodyReference =
     (
-      shoulderWidth * 0.65 +
-      torsoHeight * 0.35
+      trackedBody.shoulderWidth *
+      0.65 +
+
+      trackedBody.torsoHeight *
+      0.35
     );
+
+
+  const baseScale =
+    bodyReference *
+    MODEL_SCALE_MULTIPLIER;
+
+
+  /*
+    Fake depth.
+
+    Front:
+      bigger
+
+    Back:
+      smaller
+  */
+
+  const depthMultiplier =
+    1 +
+    orbitDepth *
+    ORBIT_DEPTH_SCALE;
 
 
   const targetScale =
     THREE.MathUtils.clamp(
 
-      bodyReference *
-      MODEL_SCALE_MULTIPLIER,
+      baseScale *
+      depthMultiplier,
 
-      0.06,
+      0.05,
       1.2
     );
 
 
   /* ---------------------------------
-     Smooth movement
+     Position smoothing
   --------------------------------- */
 
   modelAnchor.position.x =
     damp(
       modelAnchor.position.x,
-      characterThree.x,
+      targetX,
       POSITION_SMOOTHING,
       delta
     );
@@ -1783,11 +2030,27 @@ function updateCharacter(
   modelAnchor.position.y =
     damp(
       modelAnchor.position.y,
-      characterThree.y,
+      targetY,
       POSITION_SMOOTHING,
       delta
     );
 
+
+  /*
+    Fake Z is kept for debugging / future
+    behavior expansion.
+
+    This is NOT real world depth.
+  */
+
+  modelAnchor.position.z =
+    orbitDepth *
+    0.1;
+
+
+  /* ---------------------------------
+     Scale smoothing
+  --------------------------------- */
 
   const smoothScale =
     damp(
@@ -1803,21 +2066,77 @@ function updateCharacter(
   );
 
 
+  /* ---------------------------------
+     Direction
+  --------------------------------- */
+
+  if (
+    FOLLOW_ORBIT_DIRECTION
+  ) {
+
+    /*
+      Tangent of x = cos(angle)
+
+      derivative:
+      -sin(angle)
+
+      ใช้เพื่อให้โมเดลหันไปตามทิศ
+      ซ้าย/ขวาของการบิน
+    */
+
+    const movementX =
+      -Math.sin(
+        orbitAngle
+      );
+
+
+    const targetRotationY =
+      movementX >= 0
+        ? Math.PI / 2
+        : -Math.PI / 2;
+
+
+    modelAnchor.rotation.y =
+      dampAngle(
+        modelAnchor.rotation.y,
+        targetRotationY,
+        ROTATION_SMOOTHING,
+        delta
+      );
+  }
+
+
   /*
-    Character ยืนตรงเอง
-    ไม่เอียงตามไหล่ใน mode นี้
+    Slight banking while flying.
   */
 
+  const targetBank =
+    THREE.MathUtils.degToRad(
+      -orbitX * 12
+    );
+
+
   modelAnchor.rotation.z =
-    0;
+    damp(
+      modelAnchor.rotation.z,
+      targetBank,
+      ROTATION_SMOOTHING,
+      delta
+    );
 
 
   modelAnchor.visible =
     true;
 
 
+  const depthLabel =
+    orbitDepth >= 0
+      ? "FRONT"
+      : "BACK";
+
+
   anchorStatus.textContent =
-    `${CHARACTER_SIDE.toUpperCase()} SIDE | x ${modelAnchor.position.x.toFixed(3)} | y ${modelAnchor.position.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
+    `ORBIT ${depthLabel} | x ${modelAnchor.position.x.toFixed(3)} | y ${modelAnchor.position.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
 }
 
 
@@ -1866,7 +2185,8 @@ function drawLine(
 
 
   ctx.lineWidth =
-    2 * dpr;
+    2 *
+    dpr;
 
 
   ctx.stroke();
@@ -2016,6 +2336,10 @@ function predictPose() {
     now;
 
 
+  /*
+    Embedded GLB animation
+  */
+
   if (
     mixer
   ) {
@@ -2025,6 +2349,10 @@ function predictPose() {
     );
   }
 
+
+  /*
+    MediaPipe update
+  */
 
   if (
     video.readyState >= 2 &&
@@ -2062,15 +2390,18 @@ function predictPose() {
         );
 
 
-        updateCharacter(
-          landmarks,
-          delta
+        updateTrackedBody(
+          landmarks
         );
 
       } else {
 
         personStatus.textContent =
           "Not detected";
+
+
+        trackedBody.valid =
+          false;
 
 
         clearOverlay();
@@ -2103,6 +2434,18 @@ function predictPose() {
       return;
     }
   }
+
+
+  /*
+    Orbit runs every render frame.
+
+    แยกจาก MediaPipe tracking
+    เพื่อให้การบินลื่นกว่า landmark update.
+  */
+
+  updateOrbit(
+    delta
+  );
 
 
   renderer.render(
@@ -2167,7 +2510,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 6.3A initialized"
+  "[Human AR] Milestone 6.3B initialized"
 );
 
 

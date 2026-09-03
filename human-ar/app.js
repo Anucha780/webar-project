@@ -3,13 +3,24 @@ import {
   PoseLandmarker
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/+esm";
 
+import * as THREE
+  from "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js";
+
 /* =========================================================
    DOM
 ========================================================= */
 
-const video = document.querySelector("#camera");
-const overlay = document.querySelector("#pose-overlay");
-const ctx = overlay.getContext("2d");
+const video =
+  document.querySelector("#camera");
+
+const threeLayer =
+  document.querySelector("#three-layer");
+
+const overlay =
+  document.querySelector("#pose-overlay");
+
+const ctx =
+  overlay.getContext("2d");
 
 const placeholder =
   document.querySelector("#camera-placeholder");
@@ -44,6 +55,12 @@ const personStatus =
 const fpsStatus =
   document.querySelector("#fps-status");
 
+const threeStatus =
+  document.querySelector("#three-status");
+
+const anchorStatus =
+  document.querySelector("#anchor-status");
+
 const leftShoulderStatus =
   document.querySelector("#left-shoulder-status");
 
@@ -76,6 +93,19 @@ let fpsTimer = performance.now();
 
 
 /* =========================================================
+   THREE.JS STATE
+========================================================= */
+
+let scene = null;
+
+let threeCamera = null;
+
+let renderer = null;
+
+let sphere = null;
+
+
+/* =========================================================
    LANDMARK INDEXES
 ========================================================= */
 
@@ -95,7 +125,8 @@ const LANDMARK = {
 ========================================================= */
 
 function setStatus(message) {
-  statusElement.textContent = message;
+  statusElement.textContent =
+    message;
 
   console.log(
     `[Human AR] ${message}`
@@ -111,6 +142,177 @@ function setError(error) {
 
   errorStatus.textContent =
     `${error.name}: ${error.message}`;
+}
+
+
+/* =========================================================
+   THREE.JS INITIALIZATION
+========================================================= */
+
+function initializeThree() {
+
+  try {
+
+    threeStatus.textContent =
+      "Initializing...";
+
+    scene =
+      new THREE.Scene();
+
+
+    /*
+      Orthographic camera is intentional.
+
+      M4 is screen-space body tracking.
+
+      Using an orthographic camera makes
+      screen coordinate → Three.js coordinate
+      mapping deterministic.
+    */
+
+    threeCamera =
+      new THREE.OrthographicCamera(
+        0,
+        1,
+        1,
+        0,
+        -100,
+        100
+      );
+
+    threeCamera.position.z =
+      10;
+
+
+    renderer =
+      new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true
+      });
+
+    renderer.setClearColor(
+      0x000000,
+      0
+    );
+
+    renderer.setPixelRatio(
+      Math.min(
+        window.devicePixelRatio || 1,
+        2
+      )
+    );
+
+    threeLayer.appendChild(
+      renderer.domElement
+    );
+
+
+    /*
+      Test primitive.
+
+      We deliberately use a basic sphere
+      before introducing GLB.
+    */
+
+    const geometry =
+      new THREE.SphereGeometry(
+        0.045,
+        32,
+        24
+      );
+
+    const material =
+      new THREE.MeshNormalMaterial();
+
+    sphere =
+      new THREE.Mesh(
+        geometry,
+        material
+      );
+
+    sphere.visible =
+      false;
+
+    sphere.position.z =
+      0;
+
+    scene.add(
+      sphere
+    );
+
+    resizeThree();
+
+    renderer.render(
+      scene,
+      threeCamera
+    );
+
+    threeStatus.textContent =
+      `Ready r${THREE.REVISION}`;
+
+    console.log(
+      `[Human AR] Three.js revision ${THREE.REVISION}`
+    );
+
+  } catch (error) {
+
+    threeStatus.textContent =
+      "Failed";
+
+    setError(error);
+
+    throw error;
+  }
+}
+
+
+/* =========================================================
+   THREE.JS RESIZE
+========================================================= */
+
+function resizeThree() {
+
+  if (
+    !renderer ||
+    !threeCamera
+  ) {
+    return;
+  }
+
+  const rect =
+    threeLayer.getBoundingClientRect();
+
+  if (
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
+    return;
+  }
+
+  renderer.setSize(
+    rect.width,
+    rect.height,
+    false
+  );
+
+
+  /*
+    Coordinate system:
+
+    X: 0 → 1
+    Y: 0 → 1
+
+    This matches normalized screen-space
+    coordinates.
+  */
+
+  threeCamera.left = 0;
+  threeCamera.right = 1;
+
+  threeCamera.top = 1;
+  threeCamera.bottom = 0;
+
+  threeCamera.updateProjectionMatrix();
 }
 
 
@@ -165,10 +367,11 @@ async function initializePose() {
       "Ready";
 
     setStatus(
-      "Pose ready — start camera"
+      "Pose + Three.js ready — start camera"
     );
 
-    startButton.disabled = false;
+    startButton.disabled =
+      false;
 
   } catch (error) {
 
@@ -181,7 +384,8 @@ async function initializePose() {
       "MediaPipe failed"
     );
 
-    startButton.disabled = true;
+    startButton.disabled =
+      true;
   }
 }
 
@@ -192,14 +396,9 @@ async function initializePose() {
 
 function updateCameraDisplay() {
 
-  /*
-    Mirror ONLY the visible front-camera preview.
-
-    MediaPipe still receives the original
-    unmirrored camera frame.
-  */
-
-  if (facingMode === "user") {
+  if (
+    facingMode === "user"
+  ) {
 
     video.style.transform =
       "scaleX(-1)";
@@ -208,7 +407,6 @@ function updateCameraDisplay() {
 
     video.style.transform =
       "none";
-
   }
 }
 
@@ -219,10 +417,13 @@ function updateCameraDisplay() {
 
 async function startCamera() {
 
-  if (!poseLandmarker) {
+  if (
+    !poseLandmarker ||
+    !renderer
+  ) {
 
     setStatus(
-      "Pose model is not ready"
+      "Tracking system is not ready"
     );
 
     return;
@@ -235,7 +436,8 @@ async function startCamera() {
     "Requesting camera..."
   );
 
-  startButton.disabled = true;
+  startButton.disabled =
+    true;
 
   try {
 
@@ -279,6 +481,9 @@ async function startCamera() {
     video.style.display =
       "block";
 
+    threeLayer.style.display =
+      "block";
+
     overlay.style.display =
       "block";
 
@@ -298,6 +503,8 @@ async function startCamera() {
 
     resizeOverlay();
 
+    resizeThree();
+
     startButton.disabled =
       true;
 
@@ -307,19 +514,22 @@ async function startCamera() {
     stopButton.disabled =
       false;
 
-    lastVideoTime = -1;
+    lastVideoTime =
+      -1;
 
     setStatus(
-      "Camera + Pose running"
+      "Camera + Pose + Three.js running"
     );
 
     startPoseLoop();
 
   } catch (error) {
 
-    cameraRunning = false;
+    cameraRunning =
+      false;
 
-    stream = null;
+    stream =
+      null;
 
     setError(error);
 
@@ -328,6 +538,9 @@ async function startCamera() {
     );
 
     video.style.display =
+      "none";
+
+    threeLayer.style.display =
       "none";
 
     overlay.style.display =
@@ -355,20 +568,24 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP CAMERA
+   STOP
 ========================================================= */
 
 function stopStream() {
 
-  cameraRunning = false;
+  cameraRunning =
+    false;
 
-  if (animationFrameId !== null) {
+  if (
+    animationFrameId !== null
+  ) {
 
     cancelAnimationFrame(
       animationFrameId
     );
 
-    animationFrameId = null;
+    animationFrameId =
+      null;
   }
 
   if (stream) {
@@ -382,17 +599,41 @@ function stopStream() {
     }
   }
 
-  stream = null;
+  stream =
+    null;
 
-  video.srcObject = null;
+  video.srcObject =
+    null;
 
   video.style.display =
+    "none";
+
+  threeLayer.style.display =
     "none";
 
   overlay.style.display =
     "none";
 
+  if (sphere) {
+    sphere.visible = false;
+  }
+
+  anchorStatus.textContent =
+    "Hidden";
+
   clearOverlay();
+
+  if (
+    renderer &&
+    scene &&
+    threeCamera
+  ) {
+
+    renderer.render(
+      scene,
+      threeCamera
+    );
+  }
 
   placeholder.style.display =
     "flex";
@@ -464,7 +705,7 @@ async function switchCamera() {
 
 
 /* =========================================================
-   VIDEO / OVERLAY SIZE
+   SIZE
 ========================================================= */
 
 function updateResolution() {
@@ -517,20 +758,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT-FIT: COVER MAPPING
-
-   This is the important M3.1 fix.
-
-   MediaPipe coordinates belong to the ORIGINAL
-   video frame.
-
-   The browser displays that frame using:
-
-       object-fit: cover
-
-   Therefore part of the video can be cropped.
-
-   We reproduce that exact scale + crop here.
+   OBJECT-FIT COVER TRANSFORM
 ========================================================= */
 
 function getCoverTransform() {
@@ -557,17 +785,14 @@ function getCoverTransform() {
     return null;
   }
 
-  /*
-    object-fit: cover
+  const scale =
+    Math.max(
+      displayWidth /
+        sourceWidth,
 
-    Choose the larger scale so the entire
-    display area is covered.
-  */
-
-  const scale = Math.max(
-    displayWidth / sourceWidth,
-    displayHeight / sourceHeight
-  );
+      displayHeight /
+        sourceHeight
+    );
 
   const renderedWidth =
     sourceWidth * scale;
@@ -575,33 +800,35 @@ function getCoverTransform() {
   const renderedHeight =
     sourceHeight * scale;
 
-  /*
-    object-position defaults to center.
-
-    Anything outside the display box
-    is cropped equally from both sides.
-  */
-
   const cropX =
-    (renderedWidth - displayWidth) / 2;
+    (
+      renderedWidth -
+      displayWidth
+    ) / 2;
 
   const cropY =
-    (renderedHeight - displayHeight) / 2;
+    (
+      renderedHeight -
+      displayHeight
+    ) / 2;
 
   return {
     sourceWidth,
     sourceHeight,
-    scale,
-    cropX,
-    cropY,
+
     displayWidth,
-    displayHeight
+    displayHeight,
+
+    scale,
+
+    cropX,
+    cropY
   };
 }
 
 
 /* =========================================================
-   LANDMARK → DISPLAY COORDINATE
+   MEDIAPIPE → CANVAS
 ========================================================= */
 
 function landmarkToCanvas(
@@ -619,11 +846,6 @@ function landmarkToCanvas(
     };
   }
 
-  /*
-    Convert normalized MediaPipe coordinate
-    back into raw video pixels.
-  */
-
   let sourceX =
     landmark.x *
     transform.sourceWidth;
@@ -632,26 +854,14 @@ function landmarkToCanvas(
     landmark.y *
     transform.sourceHeight;
 
-
-  /*
-    The visible front-camera preview is mirrored.
-
-    Mirror the raw X coordinate before applying
-    the same cover transform.
-  */
-
-  if (facingMode === "user") {
+  if (
+    facingMode === "user"
+  ) {
 
     sourceX =
       transform.sourceWidth -
       sourceX;
   }
-
-
-  /*
-    Apply the exact scale used by object-fit: cover,
-    then remove the cropped area.
-  */
 
   const x =
     sourceX *
@@ -671,7 +881,160 @@ function landmarkToCanvas(
 
 
 /* =========================================================
-   DRAWING
+   CANVAS → THREE SCREEN SPACE
+========================================================= */
+
+function canvasToThree(
+  point
+) {
+
+  /*
+    Canvas:
+      x = 0 → width
+      y = 0 → height
+
+    Three orthographic scene:
+      x = 0 → 1
+      y = 0 → 1
+
+    Canvas Y grows downward.
+    Three Y grows upward.
+  */
+
+  return {
+
+    x:
+      point.x /
+      overlay.width,
+
+    y:
+      1 -
+      (
+        point.y /
+        overlay.height
+      )
+  };
+}
+
+
+/* =========================================================
+   UPDATE 3D SPHERE
+========================================================= */
+
+function updateThreeAnchor(
+  landmarks
+) {
+
+  const leftShoulder =
+    landmarks[
+      LANDMARK.LEFT_SHOULDER
+    ];
+
+  const rightShoulder =
+    landmarks[
+      LANDMARK.RIGHT_SHOULDER
+    ];
+
+  const leftHip =
+    landmarks[
+      LANDMARK.LEFT_HIP
+    ];
+
+  const rightHip =
+    landmarks[
+      LANDMARK.RIGHT_HIP
+    ];
+
+
+  /*
+    Synthetic torso center.
+  */
+
+  const torso = {
+
+    x:
+      (
+        leftShoulder.x +
+        rightShoulder.x +
+        leftHip.x +
+        rightHip.x
+      ) / 4,
+
+    y:
+      (
+        leftShoulder.y +
+        rightShoulder.y +
+        leftHip.y +
+        rightHip.y
+      ) / 4
+  };
+
+
+  /*
+    Use exactly the SAME mapping as
+    the debug overlay.
+  */
+
+  const canvasPoint =
+    landmarkToCanvas(
+      torso
+    );
+
+  const threePoint =
+    canvasToThree(
+      canvasPoint
+    );
+
+
+  /*
+    Do not show an object that has moved
+    completely outside the visible viewport.
+  */
+
+  const visible =
+    threePoint.x >= 0 &&
+    threePoint.x <= 1 &&
+    threePoint.y >= 0 &&
+    threePoint.y <= 1;
+
+  sphere.visible =
+    visible;
+
+  if (!visible) {
+
+    anchorStatus.textContent =
+      "Outside view";
+
+    return;
+  }
+
+
+  sphere.position.set(
+    threePoint.x,
+    threePoint.y,
+    0
+  );
+
+
+  /*
+    Rotate it slowly so we can visually
+    confirm that this is a real Three.js
+    3D mesh, not a 2D circle.
+  */
+
+  sphere.rotation.x +=
+    0.025;
+
+  sphere.rotation.y +=
+    0.035;
+
+  anchorStatus.textContent =
+    `TORSO x ${threePoint.x.toFixed(3)}, y ${threePoint.y.toFixed(3)}`;
+}
+
+
+/* =========================================================
+   DEBUG DRAWING
 ========================================================= */
 
 function drawPoint(
@@ -705,11 +1068,6 @@ function drawPoint(
 
   ctx.fill();
 
-
-  /*
-    Debug label
-  */
-
   ctx.font =
     `${11 * dpr}px Arial`;
 
@@ -718,8 +1076,12 @@ function drawPoint(
 
   ctx.fillText(
     label,
-    point.x + radius + (3 * dpr),
-    point.y - (3 * dpr)
+    point.x +
+      radius +
+      3 * dpr,
+
+    point.y -
+      3 * dpr
   );
 }
 
@@ -799,9 +1161,6 @@ function drawPose(
       LANDMARK.RIGHT_HIP
     ];
 
-
-  /* Torso */
-
   drawLine(
     leftShoulder,
     rightShoulder
@@ -821,9 +1180,6 @@ function drawPose(
     leftHip,
     rightHip
   );
-
-
-  /* Anchors */
 
   drawPoint(
     nose,
@@ -850,15 +1206,6 @@ function drawPose(
     "R HIP"
   );
 
-
-  /*
-    Torso center
-
-    This is a synthetic point calculated from
-    shoulders + hips. It is NOT a MediaPipe
-    landmark by itself.
-  */
-
   const torso = {
 
     x:
@@ -883,9 +1230,6 @@ function drawPose(
     "TORSO"
   );
 
-
-  /* Debug values */
-
   leftShoulderStatus.textContent =
     `x ${leftShoulder.x.toFixed(3)}, y ${leftShoulder.y.toFixed(3)}`;
 
@@ -906,23 +1250,30 @@ function updateFPS() {
     performance.now();
 
   const elapsed =
-    now - fpsTimer;
+    now -
+    fpsTimer;
 
-  if (elapsed >= 1000) {
+  if (
+    elapsed >= 1000
+  ) {
 
     const fps =
       Math.round(
         (
-          frameCounter * 1000
-        ) / elapsed
+          frameCounter *
+          1000
+        ) /
+        elapsed
       );
 
     fpsStatus.textContent =
       `${fps}`;
 
-    frameCounter = 0;
+    frameCounter =
+      0;
 
-    fpsTimer = now;
+    fpsTimer =
+      now;
   }
 }
 
@@ -933,7 +1284,9 @@ function updateFPS() {
 
 function startPoseLoop() {
 
-  if (!cameraRunning) {
+  if (
+    !cameraRunning
+  ) {
     return;
   }
 
@@ -963,10 +1316,11 @@ function predictPose() {
     try {
 
       const result =
-        poseLandmarker.detectForVideo(
-          video,
-          performance.now()
-        );
+        poseLandmarker
+          .detectForVideo(
+            video,
+            performance.now()
+          );
 
       if (
         result.landmarks &&
@@ -976,8 +1330,15 @@ function predictPose() {
         personStatus.textContent =
           "Detected";
 
+        const landmarks =
+          result.landmarks[0];
+
         drawPose(
-          result.landmarks[0]
+          landmarks
+        );
+
+        updateThreeAnchor(
+          landmarks
         );
 
       } else {
@@ -992,6 +1353,13 @@ function predictPose() {
           "—";
 
         clearOverlay();
+
+        if (sphere) {
+          sphere.visible = false;
+        }
+
+        anchorStatus.textContent =
+          "Hidden";
       }
 
       updateFPS();
@@ -1004,11 +1372,30 @@ function predictPose() {
         "Pose detection error"
       );
 
-      cameraRunning = false;
+      cameraRunning =
+        false;
 
       return;
     }
   }
+
+
+  /*
+    Render Three.js every animation frame.
+  */
+
+  if (
+    renderer &&
+    scene &&
+    threeCamera
+  ) {
+
+    renderer.render(
+      scene,
+      threeCamera
+    );
+  }
+
 
   animationFrameId =
     requestAnimationFrame(
@@ -1044,6 +1431,8 @@ video.addEventListener(
     updateResolution();
 
     resizeOverlay();
+
+    resizeThree();
   }
 );
 
@@ -1052,22 +1441,53 @@ window.addEventListener(
   "resize",
   () => {
 
-    if (cameraRunning) {
+    if (
+      cameraRunning
+    ) {
 
       resizeOverlay();
+
+      resizeThree();
     }
   }
 );
 
 
 /* =========================================================
-   INITIALIZE M3.1
+   INITIALIZATION
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 3.1 initialized"
+  "[Human AR] Milestone 4 initialized"
 );
 
-startButton.disabled = true;
+startButton.disabled =
+  true;
+
+
+/*
+  Initialize Three.js synchronously first.
+
+  If this fails, we do NOT proceed silently.
+*/
+
+try {
+
+  initializeThree();
+
+} catch (error) {
+
+  setStatus(
+    "Three.js failed"
+  );
+
+  startButton.disabled =
+    true;
+}
+
+
+/*
+  MediaPipe initialization remains independent.
+*/
 
 initializePose();

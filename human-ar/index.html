@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>Human AR — Pose Test</title>
+  <title>Human AR — Three.js Test</title>
 
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -19,7 +19,7 @@
 
     <header class="top-bar">
       <a class="back-link" href="../">← Back</a>
-      <span class="milestone">Human AR — M3</span>
+      <span class="milestone">Human AR — M4</span>
     </header>
 
     <section class="camera-container">
@@ -31,13 +31,16 @@
         muted
       ></video>
 
-      <!--
-        Debug overlay only.
-        Three.js will NOT use this canvas.
-      -->
+      <!-- Three.js renders here -->
+      <div id="three-layer"></div>
+
+      <!-- MediaPipe debug overlay -->
       <canvas id="pose-overlay"></canvas>
 
-      <div id="camera-placeholder" class="camera-placeholder">
+      <div
+        id="camera-placeholder"
+        class="camera-placeholder"
+      >
         Camera not started
       </div>
 
@@ -96,6 +99,16 @@
       <div class="debug-row">
         <strong>Pose FPS</strong>
         <span id="fps-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Three.js</strong>
+        <span id="three-status">Loading...</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>3D Anchor</strong>
+        <span id="anchor-status">Hidden</span>
       </div>
 
       <div class="debug-row">

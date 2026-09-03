@@ -34,7 +34,6 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   margin-bottom: 18px;
 }
 
@@ -48,9 +47,9 @@ a {
   font-size: 14px;
 }
 
-/* -------------------------
-   Camera layer
-------------------------- */
+/* =========================================================
+   CAMERA STACK
+========================================================= */
 
 .camera-container {
   position: relative;
@@ -66,6 +65,10 @@ a {
   border-radius: 14px;
 }
 
+/*
+  Layer 1 — camera
+*/
+
 #camera {
   display: none;
 
@@ -78,11 +81,33 @@ a {
 }
 
 /*
-  This canvas is ONLY the MediaPipe
-  debugging overlay.
+  Layer 2 — Three.js
 
-  It occupies exactly the same box
-  as the video.
+  This layer does NOT control the camera.
+  It is transparent.
+*/
+
+#three-layer {
+  display: none;
+
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  pointer-events: none;
+}
+
+#three-layer canvas {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+}
+
+/*
+  Layer 3 — MediaPipe debug drawing
 */
 
 #pose-overlay {
@@ -112,9 +137,9 @@ a {
   text-align: center;
 }
 
-/* -------------------------
-   Controls
-------------------------- */
+/* =========================================================
+   CONTROLS
+========================================================= */
 
 .controls {
   display: grid;
@@ -144,9 +169,9 @@ button:disabled {
   cursor: default;
 }
 
-/* -------------------------
-   Debug
-------------------------- */
+/* =========================================================
+   DEBUG
+========================================================= */
 
 .debug-panel {
   margin-top: 20px;
@@ -195,9 +220,7 @@ button:disabled {
 }
 
 @media (max-width: 520px) {
-
   .controls {
     grid-template-columns: 1fr;
   }
-
 }

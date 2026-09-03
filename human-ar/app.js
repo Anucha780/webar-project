@@ -1,7 +1,7 @@
 import {
   FilesetResolver,
   PoseLandmarker
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm";
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/+esm";
 
 /* ----------------------------------
    DOM
@@ -88,10 +88,8 @@ let fpsTimer = performance.now();
   MediaPipe Pose landmark indexes:
 
   0  = nose
-
   11 = left shoulder
   12 = right shoulder
-
   23 = left hip
   24 = right hip
 */
@@ -112,17 +110,14 @@ const LANDMARK = {
 ---------------------------------- */
 
 function setStatus(message) {
-
   statusElement.textContent = message;
 
   console.log(
     `[Human AR] ${message}`
   );
-
 }
 
 function setError(error) {
-
   console.error(
     "[Human AR Error]",
     error
@@ -130,7 +125,6 @@ function setError(error) {
 
   errorStatus.textContent =
     `${error.name}: ${error.message}`;
-
 }
 
 
@@ -139,9 +133,7 @@ function setError(error) {
 ---------------------------------- */
 
 async function initializePose() {
-
   try {
-
     setStatus(
       "Loading MediaPipe Pose..."
     );
@@ -151,7 +143,7 @@ async function initializePose() {
 
     const vision =
       await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm"
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
 
     mediapipeStatus.textContent =
@@ -161,14 +153,11 @@ async function initializePose() {
       await PoseLandmarker.createFromOptions(
         vision,
         {
-
           baseOptions: {
-
             modelAssetPath:
               "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
 
             delegate: "GPU"
-
           },
 
           runningMode: "VIDEO",
@@ -180,7 +169,6 @@ async function initializePose() {
           minPosePresenceConfidence: 0.5,
 
           minTrackingConfidence: 0.5
-
         }
       );
 
@@ -194,7 +182,6 @@ async function initializePose() {
     startButton.disabled = false;
 
   } catch (error) {
-
     mediapipeStatus.textContent =
       "Failed";
 
@@ -205,9 +192,7 @@ async function initializePose() {
     );
 
     startButton.disabled = true;
-
   }
-
 }
 
 
@@ -216,27 +201,21 @@ async function initializePose() {
 ---------------------------------- */
 
 function updateCameraDisplay() {
-
   /*
-    Only the visible preview is
-    mirrored for the front camera.
+    Front camera:
+    mirror visible preview only.
 
-    MediaPipe still receives the
-    original raw video.
+    MediaPipe still receives
+    the raw video frame.
   */
 
   if (facingMode === "user") {
-
     video.style.transform =
       "scaleX(-1)";
-
   } else {
-
     video.style.transform =
       "none";
-
   }
-
 }
 
 
@@ -245,15 +224,12 @@ function updateCameraDisplay() {
 ---------------------------------- */
 
 async function startCamera() {
-
   if (!poseLandmarker) {
-
     setStatus(
       "Pose model is not ready"
     );
 
     return;
-
   }
 
   errorStatus.textContent =
@@ -266,17 +242,14 @@ async function startCamera() {
   startButton.disabled = true;
 
   try {
-
     if (stream) {
       stopStream();
     }
 
     const constraints = {
-
       audio: false,
 
       video: {
-
         facingMode: {
           ideal: facingMode
         },
@@ -288,9 +261,7 @@ async function startCamera() {
         height: {
           ideal: 720
         }
-
       }
-
     };
 
     stream =
@@ -346,7 +317,6 @@ async function startCamera() {
     startPoseLoop();
 
   } catch (error) {
-
     cameraRunning =
       false;
 
@@ -382,39 +352,30 @@ async function startCamera() {
 
     stopButton.disabled =
       true;
-
   }
-
 }
 
 
 function stopStream() {
-
   cameraRunning =
     false;
 
   if (animationFrameId !== null) {
-
     cancelAnimationFrame(
       animationFrameId
     );
 
     animationFrameId =
       null;
-
   }
 
   if (stream) {
-
     for (
       const track
       of stream.getTracks()
     ) {
-
       track.stop();
-
     }
-
   }
 
   stream =
@@ -463,23 +424,19 @@ function stopStream() {
 
   startButton.disabled =
     !poseLandmarker;
-
 }
 
 
 function stopCamera() {
-
   stopStream();
 
   setStatus(
     "Camera stopped"
   );
-
 }
 
 
 async function switchCamera() {
-
   facingMode =
     facingMode === "user"
       ? "environment"
@@ -495,7 +452,6 @@ async function switchCamera() {
   stopStream();
 
   await startCamera();
-
 }
 
 
@@ -504,27 +460,20 @@ async function switchCamera() {
 ---------------------------------- */
 
 function updateResolution() {
-
   if (
     video.videoWidth &&
     video.videoHeight
   ) {
-
     resolutionStatus.textContent =
       `${video.videoWidth} × ${video.videoHeight}`;
-
   } else {
-
     resolutionStatus.textContent =
       "Waiting...";
-
   }
-
 }
 
 
 function resizeOverlay() {
-
   const rect =
     overlay.getBoundingClientRect();
 
@@ -540,19 +489,16 @@ function resizeOverlay() {
     Math.round(
       rect.height * dpr
     );
-
 }
 
 
 function clearOverlay() {
-
   ctx.clearRect(
     0,
     0,
     overlay.width,
     overlay.height
   );
-
 }
 
 
@@ -563,16 +509,11 @@ function clearOverlay() {
 function landmarkToCanvas(
   landmark
 ) {
-
   /*
-    IMPORTANT:
+    MediaPipe receives RAW frame.
 
-    MediaPipe receives the RAW frame.
-
-    Front camera preview is mirrored.
-
-    Therefore overlay X must also
-    be mirrored for the front camera.
+    Front camera preview is mirrored,
+    so overlay X must also be mirrored.
   */
 
   let normalizedX =
@@ -581,14 +522,11 @@ function landmarkToCanvas(
   if (
     facingMode === "user"
   ) {
-
     normalizedX =
       1 - normalizedX;
-
   }
 
   return {
-
     x:
       normalizedX *
       overlay.width,
@@ -596,9 +534,7 @@ function landmarkToCanvas(
     y:
       landmark.y *
       overlay.height
-
   };
-
 }
 
 
@@ -610,7 +546,6 @@ function drawPoint(
   landmark,
   label
 ) {
-
   const point =
     landmarkToCanvas(
       landmark
@@ -646,7 +581,6 @@ function drawPoint(
     point.x + radius + 4,
     point.y
   );
-
 }
 
 
@@ -654,7 +588,6 @@ function drawLine(
   landmarkA,
   landmarkB
 ) {
-
   const a =
     landmarkToCanvas(
       landmarkA
@@ -685,14 +618,12 @@ function drawLine(
     (window.devicePixelRatio || 1);
 
   ctx.stroke();
-
 }
 
 
 function drawPose(
   landmarks
 ) {
-
   clearOverlay();
 
   const nose =
@@ -781,7 +712,6 @@ function drawPose(
   */
 
   const torso = {
-
     x:
       (
         leftShoulder.x +
@@ -797,7 +727,6 @@ function drawPose(
         leftHip.y +
         rightHip.y
       ) / 4
-
   };
 
   drawPoint(
@@ -815,7 +744,6 @@ function drawPose(
 
   rightShoulderStatus.textContent =
     `x ${rightShoulder.x.toFixed(3)}, y ${rightShoulder.y.toFixed(3)}`;
-
 }
 
 
@@ -824,7 +752,6 @@ function drawPose(
 ---------------------------------- */
 
 function updateFPS() {
-
   frameCounter++;
 
   const now =
@@ -836,7 +763,6 @@ function updateFPS() {
   if (
     elapsed >= 1000
   ) {
-
     const fps =
       Math.round(
         (
@@ -853,9 +779,7 @@ function updateFPS() {
 
     fpsTimer =
       now;
-
   }
-
 }
 
 
@@ -864,25 +788,20 @@ function updateFPS() {
 ---------------------------------- */
 
 function startPoseLoop() {
-
   if (!cameraRunning) {
     return;
   }
 
   predictPose();
-
 }
 
 
 function predictPose() {
-
   if (
     !cameraRunning ||
     !poseLandmarker
   ) {
-
     return;
-
   }
 
   if (
@@ -890,12 +809,10 @@ function predictPose() {
     video.currentTime !==
       lastVideoTime
   ) {
-
     lastVideoTime =
       video.currentTime;
 
     try {
-
       const result =
         poseLandmarker
           .detectForVideo(
@@ -907,7 +824,6 @@ function predictPose() {
         result.landmarks &&
         result.landmarks.length > 0
       ) {
-
         personStatus.textContent =
           "Detected";
 
@@ -916,7 +832,6 @@ function predictPose() {
         );
 
       } else {
-
         personStatus.textContent =
           "Not detected";
 
@@ -927,13 +842,11 @@ function predictPose() {
           "—";
 
         clearOverlay();
-
       }
 
       updateFPS();
 
     } catch (error) {
-
       setError(error);
 
       setStatus(
@@ -944,16 +857,13 @@ function predictPose() {
         false;
 
       return;
-
     }
-
   }
 
   animationFrameId =
     requestAnimationFrame(
       predictPose
     );
-
 }
 
 
@@ -979,26 +889,19 @@ stopButton.addEventListener(
 video.addEventListener(
   "loadedmetadata",
   () => {
-
     updateResolution();
-
     resizeOverlay();
-
   }
 );
 
 window.addEventListener(
   "resize",
   () => {
-
     if (
       cameraRunning
     ) {
-
       resizeOverlay();
-
     }
-
   }
 );
 
@@ -1010,11 +913,6 @@ window.addEventListener(
 console.log(
   "[Human AR] Milestone 3 initialized"
 );
-
-/*
-  Start button remains disabled
-  until MediaPipe is ready.
-*/
 
 startButton.disabled =
   true;

@@ -11,6 +11,21 @@
   <title>Human AR — GLB Validation</title>
 
   <link rel="stylesheet" href="./style.css">
+
+  <!--
+    Import Map
+
+    GLTFLoader internally imports from "three".
+    Native browser ES Modules need this mapping.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 
 <body>

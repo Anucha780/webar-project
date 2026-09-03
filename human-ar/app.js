@@ -105,6 +105,9 @@ let animationFrameId =
 let lastVideoTime =
   -1;
 
+let lastFrameTimestamp =
+  performance.now();
+
 
 /* =========================================================
    THREE.JS
@@ -119,14 +122,6 @@ let threeCamera =
 let renderer =
   null;
 
-
-/*
-  The GLB itself will live inside modelAnchor.
-
-  We move / scale modelAnchor according to
-  MediaPipe body tracking.
-*/
-
 let modelAnchor =
   null;
 
@@ -140,67 +135,107 @@ let activeAction =
   null;
 
 
-/*
-  Base dimensions of the loaded GLB.
-*/
-
-let modelOriginalSize =
-  null;
-
-
-/*
-  Animation timing.
-*/
-
-const clock =
-  new THREE.Clock();
-
-
 /* =========================================================
-   GLB CONFIG
+   MODEL CONFIG
 ========================================================= */
 
 const MODEL_PATH =
   "./models/test-model.glb";
 
-/*
-  We inspected this during M5.
-
-  Do NOT guess another animation name.
-*/
-
 const ANIMATION_NAME =
   "Take 001";
 
 
-/* =========================================================
-   TRACKING CONFIG
-========================================================= */
-
 /*
-  This number controls how large the model
-  appears relative to shoulder width.
+  MODEL_SCALE_MULTIPLIER
 
-  It is NOT a world-unit scale.
-
-  We intentionally keep this simple in M6.1.
+  เพิ่มค่า = ตัวใหญ่ขึ้น
+  ลดค่า = ตัวเล็กลง
 */
 
 const MODEL_SCALE_MULTIPLIER =
-  2.2;
+  2.0;
 
 
 /*
-  Smoothing is intentionally minimal in M6.1.
+  Screen-space offset.
 
-  More advanced stabilization belongs to M6.2.
+  X:
+    negative = ซ้าย
+    positive = ขวา
+
+  Y:
+    negative = ลง
+    positive = ขึ้น
 */
 
-const POSITION_LERP =
-  0.35;
+const MODEL_OFFSET_X =
+  0.0;
 
-const SCALE_LERP =
-  0.25;
+const MODEL_OFFSET_Y =
+  0.0;
+
+
+/*
+  Local rotation ของ GLB
+
+  ใช้จูนทีหลังหากโมเดลหันผิดด้าน
+*/
+
+const MODEL_ROTATION_X =
+  0;
+
+const MODEL_ROTATION_Y =
+  0;
+
+const MODEL_ROTATION_Z =
+  0;
+
+
+/*
+  ให้โมเดลเอียงตามแนวหัวไหล่หรือไม่
+*/
+
+const FOLLOW_SHOULDER_TILT =
+  true;
+
+
+/*
+  จำกัดไม่ให้เอียงแรงเกินไป
+
+  20 degrees
+*/
+
+const MAX_BODY_TILT =
+  THREE.MathUtils.degToRad(
+    20
+  );
+
+
+/* =========================================================
+   SMOOTHING CONFIG
+
+   ค่ายิ่งสูง = ตามเร็วขึ้น
+   ค่ายิ่งต่ำ = เนียนขึ้น แต่หน่วงขึ้น
+========================================================= */
+
+const POSITION_SMOOTHING =
+  12;
+
+const SCALE_SMOOTHING =
+  9;
+
+const ROTATION_SMOOTHING =
+  8;
+
+
+/*
+  Landmark visibility ต่ำกว่านี้
+  จะไม่เอามาคำนวณ anchor
+*/
+
+const MIN_VISIBILITY =
+  0.55;
 
 
 /* =========================================================
@@ -208,7 +243,6 @@ const SCALE_LERP =
 ========================================================= */
 
 const LANDMARK = {
-
   NOSE: 0,
 
   LEFT_SHOULDER: 11,
@@ -220,7 +254,7 @@ const LANDMARK = {
 
 
 /* =========================================================
-   DEBUG HELPERS
+   DEBUG
 ========================================================= */
 
 function setStatus(message) {
@@ -247,7 +281,32 @@ function setError(error) {
 
 
 /* =========================================================
-   THREE.JS INITIALIZATION
+   FRAME-RATE INDEPENDENT DAMPING
+========================================================= */
+
+function damp(
+  current,
+  target,
+  smoothing,
+  delta
+) {
+
+  const factor =
+    1 -
+    Math.exp(
+      -smoothing * delta
+    );
+
+  return THREE.MathUtils.lerp(
+    current,
+    target,
+    factor
+  );
+}
+
+
+/* =========================================================
+   THREE INITIALIZATION
 ========================================================= */
 
 function initializeThree() {
@@ -263,18 +322,9 @@ function initializeThree() {
 
 
     /*
-      Orthographic camera.
+      Screen-space orthographic camera.
 
-      This means our scene is still
-      SCREEN-SPACE AR.
-
-      x:
-      0 = left
-      1 = right
-
-      y:
-      0 = bottom
-      1 = top
+      ยังไม่ใช่ world tracking.
     */
 
     threeCamera =
@@ -287,6 +337,7 @@ function initializeThree() {
         100
       );
 
+
     threeCamera.position.z =
       10;
 
@@ -297,10 +348,12 @@ function initializeThree() {
         antialias: true
       });
 
+
     renderer.setClearColor(
       0x000000,
       0
     );
+
 
     renderer.setPixelRatio(
       Math.min(
@@ -308,6 +361,7 @@ function initializeThree() {
         2
       )
     );
+
 
     renderer.outputColorSpace =
       THREE.SRGBColorSpace;
@@ -318,18 +372,13 @@ function initializeThree() {
     );
 
 
-    /*
-      GLB body anchor.
-
-      The model sits inside this group.
-      We move this group based on MediaPipe.
-    */
-
     modelAnchor =
       new THREE.Group();
 
+
     modelAnchor.visible =
       false;
+
 
     modelAnchor.position.set(
       0.5,
@@ -337,20 +386,29 @@ function initializeThree() {
       0
     );
 
+
+    /*
+      เริ่มด้วย scale เล็ก ๆ
+      เพื่อไม่ให้เกิดการกระโดดจาก 1 → target
+      ใน frame แรก
+    */
+
+    modelAnchor.scale.setScalar(
+      0.1
+    );
+
+
     scene.add(
       modelAnchor
     );
 
-
-    /*
-      Lighting for GLB materials.
-    */
 
     const ambient =
       new THREE.AmbientLight(
         0xffffff,
         2
       );
+
 
     scene.add(
       ambient
@@ -363,11 +421,13 @@ function initializeThree() {
         2.5
       );
 
+
     directional.position.set(
       1,
       2,
       4
     );
+
 
     scene.add(
       directional
@@ -396,9 +456,11 @@ function initializeThree() {
     threeStatus.textContent =
       "Failed";
 
+
     setError(
       error
     );
+
 
     throw error;
   }
@@ -406,13 +468,14 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB LOAD + VALIDATION
+   GLB
 ========================================================= */
 
 function loadGLB() {
 
   glbPathStatus.textContent =
     MODEL_PATH;
+
 
   glbLoadStatus.textContent =
     "Loading...";
@@ -430,16 +493,6 @@ function loadGLB() {
 
       try {
 
-        console.log(
-          "[GLB] Loaded",
-          gltf
-        );
-
-
-        /* ----------------------------------
-           Scene check
-        ---------------------------------- */
-
         if (!gltf.scene) {
 
           throw new Error(
@@ -448,12 +501,9 @@ function loadGLB() {
         }
 
 
-        /* ----------------------------------
-           Mesh / material check
-        ---------------------------------- */
-
         let meshCount =
           0;
+
 
         const materials =
           new Set();
@@ -466,13 +516,9 @@ function loadGLB() {
               return;
             }
 
+
             meshCount++;
 
-
-            /*
-              Make sure shadows/material updates
-              won't introduce stale transforms.
-            */
 
             object.frustumCulled =
               false;
@@ -514,6 +560,7 @@ function loadGLB() {
             meshCount
           );
 
+
         materialStatus.textContent =
           String(
             materials.size
@@ -530,10 +577,6 @@ function loadGLB() {
         }
 
 
-        /* ----------------------------------
-           Bounding box
-        ---------------------------------- */
-
         const box =
           new THREE.Box3()
             .setFromObject(
@@ -548,6 +591,7 @@ function loadGLB() {
           bboxStatus.textContent =
             "EMPTY";
 
+
           throw new Error(
             "GLB bounding box is empty"
           );
@@ -557,6 +601,7 @@ function loadGLB() {
         const size =
           new THREE.Vector3();
 
+
         const center =
           new THREE.Vector3();
 
@@ -565,13 +610,10 @@ function loadGLB() {
           size
         );
 
+
         box.getCenter(
           center
         );
-
-
-        modelOriginalSize =
-          size.clone();
 
 
         bboxStatus.textContent =
@@ -582,33 +624,12 @@ function loadGLB() {
           `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
 
 
-        console.log(
-          "[GLB Size]",
-          size
-        );
-
-        console.log(
-          "[GLB Center]",
-          center
-        );
-
-
-        /* ----------------------------------
-           Center GLB locally
-        ---------------------------------- */
-
         loadedModel =
           gltf.scene;
 
 
         /*
-          Move the MODEL relative to its anchor.
-
-          modelAnchor itself remains at (0,0,0)
-          locally.
-
-          This is important because later
-          MediaPipe moves modelAnchor.
+          Center model around its local origin.
         */
 
         loadedModel.position.set(
@@ -617,15 +638,6 @@ function loadGLB() {
           -center.z
         );
 
-
-        /*
-          Normalize original GLB size.
-
-          Its largest dimension becomes 1.
-
-          From this point onward, body tracking
-          controls modelAnchor.scale.
-        */
 
         const maxDimension =
           Math.max(
@@ -648,8 +660,26 @@ function loadGLB() {
         }
 
 
+        /*
+          Normalize GLB.
+
+          หลังจากนั้น modelAnchor.scale
+          จะเป็นผู้ควบคุมขนาดตามคน
+        */
+
         loadedModel.scale.setScalar(
           1 / maxDimension
+        );
+
+
+        /*
+          Local orientation configuration.
+        */
+
+        loadedModel.rotation.set(
+          MODEL_ROTATION_X,
+          MODEL_ROTATION_Y,
+          MODEL_ROTATION_Z
         );
 
 
@@ -659,7 +689,7 @@ function loadGLB() {
 
 
         /* ----------------------------------
-           Animation inspection
+           Animation
         ---------------------------------- */
 
         const animations =
@@ -691,10 +721,6 @@ function loadGLB() {
           clipNames
         );
 
-
-        /* ----------------------------------
-           Exact animation selection
-        ---------------------------------- */
 
         const selectedClip =
           THREE.AnimationClip.findByName(
@@ -732,10 +758,12 @@ function loadGLB() {
 
           activeAction.reset();
 
+
           activeAction.setLoop(
             THREE.LoopRepeat,
             Infinity
           );
+
 
           activeAction.play();
 
@@ -746,11 +774,6 @@ function loadGLB() {
         }
 
 
-        /*
-          Do not show model until a person
-          is detected.
-        */
-
         modelAnchor.visible =
           false;
 
@@ -760,7 +783,7 @@ function loadGLB() {
 
 
         setStatus(
-          `GLB ready — animation: ${ANIMATION_NAME}`
+          `GLB ready — ${ANIMATION_NAME}`
         );
 
 
@@ -774,9 +797,11 @@ function loadGLB() {
         glbLoadStatus.textContent =
           "FAILED";
 
+
         setError(
           error
         );
+
 
         setStatus(
           "GLB validation failed"
@@ -799,6 +824,7 @@ function loadGLB() {
             ) *
             100
           );
+
 
         glbLoadStatus.textContent =
           `${percent}%`;
@@ -839,7 +865,7 @@ function loadGLB() {
 
 
 /* =========================================================
-   MEDIAPIPE INITIALIZATION
+   MEDIAPIPE
 ========================================================= */
 
 async function initializePose() {
@@ -932,17 +958,10 @@ async function initializePose() {
 
 
 /* =========================================================
-   CAMERA DISPLAY
+   CAMERA
 ========================================================= */
 
 function updateCameraDisplay() {
-
-  /*
-    Front camera preview = mirror.
-
-    Raw video sent into MediaPipe
-    remains unchanged.
-  */
 
   if (
     facingMode === "user"
@@ -958,10 +977,6 @@ function updateCameraDisplay() {
   }
 }
 
-
-/* =========================================================
-   CAMERA START
-========================================================= */
 
 async function startCamera() {
 
@@ -983,11 +998,6 @@ async function startCamera() {
     "None";
 
 
-  setStatus(
-    "Requesting camera..."
-  );
-
-
   startButton.disabled =
     true;
 
@@ -1000,36 +1010,31 @@ async function startCamera() {
     }
 
 
-    const constraints = {
-
-      audio:
-        false,
-
-      video: {
-
-        facingMode: {
-          ideal:
-            facingMode
-        },
-
-        width: {
-          ideal:
-            1280
-        },
-
-        height: {
-          ideal:
-            720
-        }
-      }
-    };
-
-
     stream =
       await navigator.mediaDevices
-        .getUserMedia(
-          constraints
-        );
+        .getUserMedia({
+
+          audio:
+            false,
+
+          video: {
+
+            facingMode: {
+              ideal:
+                facingMode
+            },
+
+            width: {
+              ideal:
+                1280
+            },
+
+            height: {
+              ideal:
+                720
+            }
+          }
+        });
 
 
     video.srcObject =
@@ -1087,11 +1092,12 @@ async function startCamera() {
       -1;
 
 
-    clock.start();
+    lastFrameTimestamp =
+      performance.now();
 
 
     setStatus(
-      "Camera + Pose + GLB running"
+      "M6.2 tracking running"
     );
 
 
@@ -1120,7 +1126,7 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP
+   STOP / SWITCH
 ========================================================= */
 
 function stopStream() {
@@ -1136,6 +1142,7 @@ function stopStream() {
     cancelAnimationFrame(
       animationFrameId
     );
+
 
     animationFrameId =
       null;
@@ -1231,10 +1238,6 @@ function stopCamera() {
 }
 
 
-/* =========================================================
-   SWITCH CAMERA
-========================================================= */
-
 async function switchCamera() {
 
   facingMode =
@@ -1251,7 +1254,7 @@ async function switchCamera() {
 
 
 /* =========================================================
-   SIZE
+   RESIZE
 ========================================================= */
 
 function resizeOverlay() {
@@ -1342,7 +1345,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT-FIT COVER MAPPING
+   OBJECT-FIT COVER
 ========================================================= */
 
 function getCoverTransform() {
@@ -1395,20 +1398,6 @@ function getCoverTransform() {
     scale;
 
 
-  const cropX =
-    (
-      renderedWidth -
-      displayWidth
-    ) / 2;
-
-
-  const cropY =
-    (
-      renderedHeight -
-      displayHeight
-    ) / 2;
-
-
   return {
 
     sourceWidth,
@@ -1421,15 +1410,23 @@ function getCoverTransform() {
 
     scale,
 
-    cropX,
+    cropX:
+      (
+        renderedWidth -
+        displayWidth
+      ) / 2,
 
-    cropY
+    cropY:
+      (
+        renderedHeight -
+        displayHeight
+      ) / 2
   };
 }
 
 
 /* =========================================================
-   LANDMARK → CANVAS
+   COORDINATE MAPPING
 ========================================================= */
 
 function landmarkToCanvas(
@@ -1459,10 +1456,6 @@ function landmarkToCanvas(
     transform.sourceHeight;
 
 
-  /*
-    Match mirrored front-camera preview.
-  */
-
   if (
     facingMode === "user"
   ) {
@@ -1488,10 +1481,6 @@ function landmarkToCanvas(
 }
 
 
-/* =========================================================
-   CANVAS → THREE SCREEN COORDINATES
-========================================================= */
-
 function canvasToThree(
   point
 ) {
@@ -1513,7 +1502,7 @@ function canvasToThree(
 
 
 /* =========================================================
-   DISTANCE
+   UTILS
 ========================================================= */
 
 function distance2D(
@@ -1538,12 +1527,38 @@ function distance2D(
 }
 
 
+function landmarkIsReliable(
+  landmark
+) {
+
+  if (!landmark) {
+    return false;
+  }
+
+
+  if (
+    landmark.visibility ===
+    undefined
+  ) {
+
+    return true;
+  }
+
+
+  return (
+    landmark.visibility >=
+    MIN_VISIBILITY
+  );
+}
+
+
 /* =========================================================
-   GLB BODY ANCHOR
+   BODY TRACKING
 ========================================================= */
 
 function updateModelAnchor(
-  landmarks
+  landmarks,
+  delta
 ) {
 
   const leftShoulder =
@@ -1571,37 +1586,120 @@ function updateModelAnchor(
 
 
   /*
-    Synthetic torso center.
+    ไม่ใช้ tracking frame ที่ landmarks
+    หลักไม่น่าเชื่อถือ
   */
 
-  const torso = {
+  const reliable =
+    landmarkIsReliable(
+      leftShoulder
+    ) &&
+    landmarkIsReliable(
+      rightShoulder
+    ) &&
+    landmarkIsReliable(
+      leftHip
+    ) &&
+    landmarkIsReliable(
+      rightHip
+    );
+
+
+  if (!reliable) {
+
+    anchorStatus.textContent =
+      "Low confidence";
+
+
+    return;
+  }
+
+
+  /* ----------------------------------
+     Display-space landmark points
+  ---------------------------------- */
+
+  const leftShoulderCanvas =
+    landmarkToCanvas(
+      leftShoulder
+    );
+
+
+  const rightShoulderCanvas =
+    landmarkToCanvas(
+      rightShoulder
+    );
+
+
+  const leftHipCanvas =
+    landmarkToCanvas(
+      leftHip
+    );
+
+
+  const rightHipCanvas =
+    landmarkToCanvas(
+      rightHip
+    );
+
+
+  /* ----------------------------------
+     Centers
+  ---------------------------------- */
+
+  const shoulderCenter = {
 
     x:
       (
-        leftShoulder.x +
-        rightShoulder.x +
-        leftHip.x +
-        rightHip.x
-      ) / 4,
+        leftShoulderCanvas.x +
+        rightShoulderCanvas.x
+      ) / 2,
 
     y:
       (
-        leftShoulder.y +
-        rightShoulder.y +
-        leftHip.y +
-        rightHip.y
-      ) / 4
+        leftShoulderCanvas.y +
+        rightShoulderCanvas.y
+      ) / 2
+  };
+
+
+  const hipCenter = {
+
+    x:
+      (
+        leftHipCanvas.x +
+        rightHipCanvas.x
+      ) / 2,
+
+    y:
+      (
+        leftHipCanvas.y +
+        rightHipCanvas.y
+      ) / 2
   };
 
 
   /*
-    Convert torso to visible canvas location.
+    Torso center from DISPLAY coordinates,
+    not normalized MediaPipe coordinates.
+
+    This keeps crop/mirror correction exact.
   */
 
-  const torsoCanvas =
-    landmarkToCanvas(
-      torso
-    );
+  const torsoCanvas = {
+
+    x:
+      (
+        shoulderCenter.x +
+        hipCenter.x
+      ) / 2,
+
+    y:
+      (
+        shoulderCenter.y +
+        hipCenter.y
+      ) / 2
+  };
 
 
   const torsoThree =
@@ -1610,101 +1708,136 @@ function updateModelAnchor(
     );
 
 
-  /*
-    Shoulder points use exactly the same
-    camera crop / mirror correction.
-  */
+  /* ----------------------------------
+     Screen offset
+  ---------------------------------- */
 
-  const leftCanvas =
-    landmarkToCanvas(
-      leftShoulder
-    );
+  const targetX =
+    torsoThree.x +
+    MODEL_OFFSET_X;
 
 
-  const rightCanvas =
-    landmarkToCanvas(
-      rightShoulder
-    );
+  const targetY =
+    torsoThree.y +
+    MODEL_OFFSET_Y;
 
 
-  /*
-    Convert shoulder width to normalized
-    screen units.
+  /* ----------------------------------
+     Scale
 
-    Larger person in frame
-    → larger shoulder distance
-    → larger GLB.
-  */
+     Combine shoulder width + torso height
+     เพื่อให้เสถียรกว่าดู shoulder อย่างเดียว
+  ---------------------------------- */
 
-  const shoulderDistancePixels =
+  const shoulderWidth =
     distance2D(
-      leftCanvas,
-      rightCanvas
-    );
-
-
-  const shoulderScreenWidth =
-    shoulderDistancePixels /
+      leftShoulderCanvas,
+      rightShoulderCanvas
+    ) /
     overlay.width;
 
 
-  const targetScale =
-    shoulderScreenWidth *
-    MODEL_SCALE_MULTIPLIER;
+  const torsoHeight =
+    distance2D(
+      shoulderCenter,
+      hipCenter
+    ) /
+    overlay.height;
 
 
-  /*
-    Basic safety clamp.
-
-    Prevent wild scale when landmarks
-    briefly become unstable.
-  */
-
-  const safeScale =
-    THREE.MathUtils.clamp(
-      targetScale,
-      0.08,
-      1.2
+  const bodyScaleReference =
+    (
+      shoulderWidth * 0.65 +
+      torsoHeight * 0.35
     );
 
 
-  /*
-    Position smoothing.
-  */
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      bodyScaleReference *
+      MODEL_SCALE_MULTIPLIER,
+
+      0.07,
+      1.3
+    );
+
+
+  /* ----------------------------------
+     Shoulder tilt
+  ---------------------------------- */
+
+  let targetRotationZ =
+    0;
+
+
+  if (
+    FOLLOW_SHOULDER_TILT
+  ) {
+
+    const dx =
+      rightShoulderCanvas.x -
+      leftShoulderCanvas.x;
+
+
+    const dy =
+      rightShoulderCanvas.y -
+      leftShoulderCanvas.y;
+
+
+    /*
+      Canvas y grows downward,
+      so negate atan result for Three.js.
+    */
+
+    targetRotationZ =
+      -Math.atan2(
+        dy,
+        dx
+      );
+
+
+    targetRotationZ =
+      THREE.MathUtils.clamp(
+        targetRotationZ,
+        -MAX_BODY_TILT,
+        MAX_BODY_TILT
+      );
+  }
+
+
+  /* ----------------------------------
+     Position damping
+  ---------------------------------- */
 
   modelAnchor.position.x =
-    THREE.MathUtils.lerp(
+    damp(
       modelAnchor.position.x,
-      torsoThree.x,
-      POSITION_LERP
+      targetX,
+      POSITION_SMOOTHING,
+      delta
     );
 
 
   modelAnchor.position.y =
-    THREE.MathUtils.lerp(
+    damp(
       modelAnchor.position.y,
-      torsoThree.y,
-      POSITION_LERP
+      targetY,
+      POSITION_SMOOTHING,
+      delta
     );
 
 
-  modelAnchor.position.z =
-    0;
-
-
-  /*
-    Uniform scale smoothing.
-  */
-
-  const currentScale =
-    modelAnchor.scale.x;
-
+  /* ----------------------------------
+     Scale damping
+  ---------------------------------- */
 
   const smoothScale =
-    THREE.MathUtils.lerp(
-      currentScale,
-      safeScale,
-      SCALE_LERP
+    damp(
+      modelAnchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
     );
 
 
@@ -1713,17 +1846,30 @@ function updateModelAnchor(
   );
 
 
+  /* ----------------------------------
+     Rotation damping
+  ---------------------------------- */
+
+  modelAnchor.rotation.z =
+    damp(
+      modelAnchor.rotation.z,
+      targetRotationZ,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
   modelAnchor.visible =
     true;
 
 
   anchorStatus.textContent =
-    `TORSO ${torsoThree.x.toFixed(3)}, ${torsoThree.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
+    `x ${modelAnchor.position.x.toFixed(3)} | y ${modelAnchor.position.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
 }
 
 
 /* =========================================================
-   DEBUG POSE DRAWING
+   DEBUG POSE
 ========================================================= */
 
 function drawPoint(
@@ -1776,29 +1922,28 @@ function drawPoint(
   ctx.fillText(
     label,
     point.x +
-      radius +
-      3 * dpr,
-
+    radius +
+    3 * dpr,
     point.y -
-      3 * dpr
+    3 * dpr
   );
 }
 
 
 function drawLine(
-  landmarkA,
-  landmarkB
+  aLandmark,
+  bLandmark
 ) {
 
   const a =
     landmarkToCanvas(
-      landmarkA
+      aLandmark
     );
 
 
   const b =
     landmarkToCanvas(
-      landmarkB
+      bLandmark
     );
 
 
@@ -1923,32 +2068,6 @@ function drawPose(
     rightHip,
     "R HIP"
   );
-
-
-  const torso = {
-
-    x:
-      (
-        leftShoulder.x +
-        rightShoulder.x +
-        leftHip.x +
-        rightHip.x
-      ) / 4,
-
-    y:
-      (
-        leftShoulder.y +
-        rightShoulder.y +
-        leftHip.y +
-        rightHip.y
-      ) / 4
-  };
-
-
-  drawPoint(
-    torso,
-    "TORSO"
-  );
 }
 
 
@@ -1967,13 +2086,22 @@ function predictPose() {
   }
 
 
-  /*
-    Update GLB animation independently
-    from pose detection frequency.
-  */
+  const now =
+    performance.now();
+
 
   const delta =
-    clock.getDelta();
+    Math.min(
+      (
+        now -
+        lastFrameTimestamp
+      ) / 1000,
+      0.1
+    );
+
+
+  lastFrameTimestamp =
+    now;
 
 
   if (
@@ -1989,7 +2117,7 @@ function predictPose() {
   if (
     video.readyState >= 2 &&
     video.currentTime !==
-      lastVideoTime
+    lastVideoTime
   ) {
 
     lastVideoTime =
@@ -2001,7 +2129,7 @@ function predictPose() {
       const result =
         poseLandmarker.detectForVideo(
           video,
-          performance.now()
+          now
         );
 
 
@@ -2024,7 +2152,8 @@ function predictPose() {
 
 
         updateModelAnchor(
-          landmarks
+          landmarks,
+          delta
         );
 
       } else {
@@ -2132,7 +2261,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 6.1 initialized"
+  "[Human AR] Milestone 6.2 initialized"
 );
 
 

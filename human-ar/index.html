@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>Human AR — Camera Test</title>
+  <title>Human AR — Pose Test</title>
 
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -19,10 +19,7 @@
 
     <header class="top-bar">
       <a class="back-link" href="../">← Back</a>
-
-      <span class="milestone">
-        Human AR — M2
-      </span>
+      <span class="milestone">Human AR — M3</span>
     </header>
 
     <section class="camera-container">
@@ -33,6 +30,12 @@
         playsinline
         muted
       ></video>
+
+      <!--
+        Debug overlay only.
+        Three.js will NOT use this canvas.
+      -->
+      <canvas id="pose-overlay"></canvas>
 
       <div id="camera-placeholder" class="camera-placeholder">
         Camera not started
@@ -62,22 +65,7 @@
 
       <div class="debug-row">
         <strong>Status</strong>
-        <span id="status">Ready</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Protocol</strong>
-        <span id="protocol-status">Checking...</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Secure Context</strong>
-        <span id="secure-status">Checking...</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>getUserMedia</strong>
-        <span id="media-status">Checking...</span>
+        <span id="status">Loading...</span>
       </div>
 
       <div class="debug-row">
@@ -93,6 +81,31 @@
       <div class="debug-row">
         <strong>Resolution</strong>
         <span id="resolution-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>MediaPipe</strong>
+        <span id="mediapipe-status">Loading...</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Person</strong>
+        <span id="person-status">Not detected</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Pose FPS</strong>
+        <span id="fps-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Left Shoulder</strong>
+        <span id="left-shoulder-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Right Shoulder</strong>
+        <span id="right-shoulder-status">—</span>
       </div>
 
       <div class="debug-row">

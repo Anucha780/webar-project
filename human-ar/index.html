@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
+
+  <title>Human AR</title>
+
+  <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+
+  <main class="app">
+
+    <a class="back-link" href="../">
+      ← Back
+    </a>
+
+    <h1>Human AR</h1>
+
+    <p>
+      Human AR development environment.
+    </p>
+
+    <section class="debug-panel">
+      <div>
+        <strong>Status</strong>
+        <span id="status">Starting...</span>
+      </div>
+
+      <div>
+        <strong>JavaScript</strong>
+        <span id="js-status">Waiting</span>
+      </div>
+
+      <div>
+        <strong>Protocol</strong>
+        <span id="protocol-status">Checking</span>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="./app.js"></script>
+
+</body>
+</html>

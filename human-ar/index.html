@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>Human AR</title>
+  <title>Human AR — Camera Test</title>
 
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -17,31 +17,89 @@
 
   <main class="app">
 
-    <a class="back-link" href="../">
-      ← Back
-    </a>
+    <header class="top-bar">
+      <a class="back-link" href="../">← Back</a>
 
-    <h1>Human AR</h1>
+      <span class="milestone">
+        Human AR — M2
+      </span>
+    </header>
 
-    <p>
-      Human AR development environment.
-    </p>
+    <section class="camera-container">
+
+      <video
+        id="camera"
+        autoplay
+        playsinline
+        muted
+      ></video>
+
+      <div id="camera-placeholder" class="camera-placeholder">
+        Camera not started
+      </div>
+
+    </section>
+
+    <section class="controls">
+
+      <button id="start-camera" type="button">
+        Start Camera
+      </button>
+
+      <button id="switch-camera" type="button" disabled>
+        Switch Camera
+      </button>
+
+      <button id="stop-camera" type="button" disabled>
+        Stop Camera
+      </button>
+
+    </section>
 
     <section class="debug-panel">
-      <div>
+
+      <h2>Debug Status</h2>
+
+      <div class="debug-row">
         <strong>Status</strong>
-        <span id="status">Starting...</span>
+        <span id="status">Ready</span>
       </div>
 
-      <div>
-        <strong>JavaScript</strong>
-        <span id="js-status">Waiting</span>
-      </div>
-
-      <div>
+      <div class="debug-row">
         <strong>Protocol</strong>
-        <span id="protocol-status">Checking</span>
+        <span id="protocol-status">Checking...</span>
       </div>
+
+      <div class="debug-row">
+        <strong>Secure Context</strong>
+        <span id="secure-status">Checking...</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>getUserMedia</strong>
+        <span id="media-status">Checking...</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Camera</strong>
+        <span id="camera-status">Stopped</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Facing Mode</strong>
+        <span id="facing-status">user</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Resolution</strong>
+        <span id="resolution-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Error</strong>
+        <span id="error-status">None</span>
+      </div>
+
     </section>
 
   </main>

@@ -29,15 +29,10 @@ a {
     max(30px, env(safe-area-inset-bottom));
 }
 
-/* -------------------------
-   Header
-------------------------- */
-
 .top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   margin-bottom: 18px;
 }
 
@@ -51,83 +46,53 @@ a {
   font-size: 14px;
 }
 
-/* -------------------------
-   Camera
-------------------------- */
-
 .camera-container {
   position: relative;
-
   width: 100%;
   aspect-ratio: 3 / 4;
-
   overflow: hidden;
-
   background: #050506;
-
   border: 1px solid #30343c;
   border-radius: 14px;
 }
 
-/*
-  Important:
-  video is controlled only inside
-  camera-container.
-
-  No fixed / absolute fullscreen camera.
-*/
-
 #camera {
   display: none;
-
   width: 100%;
   height: 100%;
-
   object-fit: cover;
-
   background: #000000;
+}
+
+#camera.mirror {
+  transform: scaleX(-1);
 }
 
 .camera-placeholder {
   position: absolute;
   inset: 0;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   padding: 24px;
-
   color: #8f96a3;
-
   text-align: center;
 }
-
-/* -------------------------
-   Controls
-------------------------- */
 
 .controls {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-
   gap: 10px;
-
   margin-top: 14px;
 }
 
 button {
   min-height: 46px;
-
   padding: 10px 12px;
-
   color: #ffffff;
-
   background: #24272e;
-
   border: 1px solid #3a3f49;
   border-radius: 9px;
-
   cursor: pointer;
 }
 
@@ -136,34 +101,24 @@ button:disabled {
   cursor: default;
 }
 
-/* -------------------------
-   Debug
-------------------------- */
-
 .debug-panel {
   margin-top: 20px;
   padding: 16px;
-
   background: #17191e;
-
   border: 1px solid #30343c;
   border-radius: 12px;
 }
 
 .debug-panel h2 {
   margin: 0 0 12px;
-
   font-size: 16px;
 }
 
 .debug-row {
   display: flex;
   justify-content: space-between;
-
   gap: 20px;
-
   padding: 7px 0;
-
   border-bottom: 1px solid #24272e;
 }
 
@@ -178,23 +133,14 @@ button:disabled {
 
 .debug-row span {
   max-width: 60%;
-
   color: #8ee99a;
-
   font-size: 13px;
   text-align: right;
-
   overflow-wrap: anywhere;
 }
 
-/* -------------------------
-   Mobile
-------------------------- */
-
 @media (max-width: 520px) {
-
   .controls {
     grid-template-columns: 1fr;
   }
-
 }

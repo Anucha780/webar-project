@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -8,12 +10,16 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>Human AR — Capture Photo</title>
+  <title>
+    Human AR — Multi Model
+  </title>
+
 
   <link
     rel="stylesheet"
     href="./style.css"
   >
+
 
   <script type="importmap">
   {
@@ -23,11 +29,14 @@
     }
   }
   </script>
+
 </head>
+
 
 <body>
 
   <main class="app">
+
 
     <div class="top-bar">
 
@@ -38,14 +47,17 @@
         ← Back
       </a>
 
+
       <span class="milestone">
-        Human AR — M7
+        Human AR — M8.1
       </span>
 
     </div>
 
 
+
     <div class="camera-container">
+
 
       <video
         id="camera"
@@ -75,7 +87,16 @@
     </div>
 
 
+
     <div class="controls">
+
+
+      <select
+        id="model-selector"
+        disabled
+      >
+      </select>
+
 
       <button
         id="start-camera"
@@ -111,6 +132,7 @@
     </div>
 
 
+
     <section class="debug-panel">
 
       <h2>
@@ -133,6 +155,18 @@
       <div class="debug-row">
         <strong>Three.js</strong>
         <span id="three-status">Waiting...</span>
+      </div>
+
+
+      <div class="debug-row">
+        <strong>Active Model</strong>
+        <span id="active-model-status">Waiting...</span>
+      </div>
+
+
+      <div class="debug-row">
+        <strong>Behavior</strong>
+        <span id="behavior-status">Waiting...</span>
       </div>
 
 
@@ -185,6 +219,12 @@
 
 
       <div class="debug-row">
+        <strong>Selected Clip</strong>
+        <span id="selected-clip-status">None</span>
+      </div>
+
+
+      <div class="debug-row">
         <strong>Camera</strong>
         <span id="camera-status">Stopped</span>
       </div>
@@ -204,7 +244,9 @@
 
       <div class="debug-row">
         <strong>Capture</strong>
-        <span id="capture-status">Ready when camera starts</span>
+        <span id="capture-status">
+          Ready when camera starts
+        </span>
       </div>
 
 
@@ -224,4 +266,5 @@
   ></script>
 
 </body>
+
 </html>

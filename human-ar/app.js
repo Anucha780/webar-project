@@ -4,11 +4,20 @@ import {
   ImageSegmenter
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/+esm";
 
+
 import * as THREE from "three";
+
 
 import {
   GLTFLoader
 } from "three/addons/loaders/GLTFLoader.js";
+
+
+import {
+  MODEL_REGISTRY,
+  DEFAULT_MODEL_ID,
+  getModelConfig
+} from "./models.js";
 
 
 /* =========================================================
@@ -30,6 +39,10 @@ const ctx =
 const placeholder =
   document.querySelector("#camera-placeholder");
 
+
+const modelSelector =
+  document.querySelector("#model-selector");
+
 const startButton =
   document.querySelector("#start-camera");
 
@@ -42,6 +55,7 @@ const captureButton =
 const stopButton =
   document.querySelector("#stop-camera");
 
+
 const statusElement =
   document.querySelector("#status");
 
@@ -50,6 +64,12 @@ const mediapipeStatus =
 
 const threeStatus =
   document.querySelector("#three-status");
+
+const activeModelStatus =
+  document.querySelector("#active-model-status");
+
+const behaviorStatus =
+  document.querySelector("#behavior-status");
 
 const glbPathStatus =
   document.querySelector("#glb-path-status");
@@ -75,6 +95,9 @@ const animationStatus =
 const clipStatus =
   document.querySelector("#clip-status");
 
+const selectedClipStatus =
+  document.querySelector("#selected-clip-status");
+
 const cameraStatus =
   document.querySelector("#camera-status");
 
@@ -95,7 +118,8 @@ const errorStatus =
    STATE
 ========================================================= */
 
-let stream = null;
+let stream =
+  null;
 
 let facingMode =
   "user";
@@ -119,6 +143,26 @@ let lastFrameTimestamp =
   performance.now();
 
 let latestLandmarks =
+  null;
+
+
+/* =========================================================
+   MODEL STATE
+========================================================= */
+
+let activeModelId =
+  DEFAULT_MODEL_ID;
+
+let activeModelConfig =
+  null;
+
+let loadedModel =
+  null;
+
+let mixer =
+  null;
+
+let activeAction =
   null;
 
 
@@ -209,43 +253,11 @@ let renderer =
 let modelAnchor =
   null;
 
-let loadedModel =
-  null;
-
-let mixer =
-  null;
-
-let activeAction =
-  null;
-
-
-/* =========================================================
-   MODEL
-========================================================= */
-
-const MODEL_PATH =
-  "./models/test-model.glb";
-
-
-const MODEL_SCALE_MULTIPLIER =
-  1.35;
-
-
-const MODEL_ROTATION_X =
-  0;
-
-const MODEL_ROTATION_Y =
-  0;
-
-const MODEL_ROTATION_Z =
-  0;
-
 
 /* =========================================================
    ORBIT
 
-   IMPORTANT:
-   ค่าเหล่านี้คงเดิมจาก Milestone ที่ผ่านแล้ว
+   M6 values are intentionally unchanged.
 ========================================================= */
 
 const ORBIT_SPEED =
@@ -298,11 +310,17 @@ const MIN_VISIBILITY =
 
 const LANDMARK = {
 
-  LEFT_SHOULDER: 11,
-  RIGHT_SHOULDER: 12,
+  LEFT_SHOULDER:
+    11,
 
-  LEFT_HIP: 23,
-  RIGHT_HIP: 24
+  RIGHT_SHOULDER:
+    12,
+
+  LEFT_HIP:
+    23,
+
+  RIGHT_HIP:
+    24
 };
 
 
@@ -341,7 +359,9 @@ const trackedBody = {
    DEBUG
 ========================================================= */
 
-function setStatus(message) {
+function setStatus(
+  message
+) {
 
   statusElement.textContent =
     message;
@@ -353,7 +373,16 @@ function setStatus(message) {
 }
 
 
-function setError(error) {
+function clearError() {
+
+  errorStatus.textContent =
+    "None";
+}
+
+
+function setError(
+  error
+) {
 
   console.error(
     "[Human AR Error]",
@@ -363,6 +392,50 @@ function setError(error) {
 
   errorStatus.textContent =
     `${error.name}: ${error.message}`;
+}
+
+
+/* =========================================================
+   MODEL SELECTOR
+========================================================= */
+
+function initializeModelSelector() {
+
+  modelSelector.innerHTML =
+    "";
+
+
+  for (
+    const model
+    of MODEL_REGISTRY
+  ) {
+
+    const option =
+      document.createElement(
+        "option"
+      );
+
+
+    option.value =
+      model.id;
+
+
+    option.textContent =
+      model.name;
+
+
+    modelSelector.appendChild(
+      option
+    );
+  }
+
+
+  modelSelector.value =
+    activeModelId;
+
+
+  modelSelector.disabled =
+    MODEL_REGISTRY.length === 0;
 }
 
 
@@ -380,7 +453,8 @@ function damp(
   const factor =
     1 -
     Math.exp(
-      -smoothing * delta
+      -smoothing *
+      delta
     );
 
 
@@ -405,7 +479,8 @@ function dampAngle(
 
 
   while (
-    difference > Math.PI
+    difference >
+    Math.PI
   ) {
 
     difference -=
@@ -414,7 +489,8 @@ function dampAngle(
 
 
   while (
-    difference < -Math.PI
+    difference <
+    -Math.PI
   ) {
 
     difference +=
@@ -425,7 +501,8 @@ function dampAngle(
   const factor =
     1 -
     Math.exp(
-      -smoothing * delta
+      -smoothing *
+      delta
     );
 
 
@@ -468,14 +545,6 @@ function initializeThree() {
       10;
 
 
-    /*
-      preserveDrawingBuffer = true
-
-      ทำให้ canvas ของ Three.js
-      สามารถนำไปวาดลง Capture Canvas
-      ได้อย่างเชื่อถือได้
-    */
-
     renderer =
       new THREE.WebGLRenderer({
 
@@ -498,7 +567,8 @@ function initializeThree() {
 
     renderer.setPixelRatio(
       Math.min(
-        window.devicePixelRatio || 1,
+        window.devicePixelRatio ||
+        1,
         2
       )
     );
@@ -598,17 +668,200 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB LOAD + VALIDATION
+   MODEL CLEANUP
 ========================================================= */
 
-function loadGLB() {
+function disposeLoadedModel() {
 
-  glbPathStatus.textContent =
-    MODEL_PATH;
+  if (
+    mixer
+  ) {
 
+    mixer.stopAllAction();
+  }
+
+
+  if (
+    loadedModel
+  ) {
+
+    loadedModel.traverse(
+      object => {
+
+        if (
+          !object.isMesh
+        ) {
+
+          return;
+        }
+
+
+        if (
+          object.geometry
+        ) {
+
+          object.geometry.dispose();
+        }
+
+
+        if (
+          !object.material
+        ) {
+
+          return;
+        }
+
+
+        const materials =
+          Array.isArray(
+            object.material
+          )
+            ? object.material
+            : [
+                object.material
+              ];
+
+
+        for (
+          const material
+          of materials
+        ) {
+
+          for (
+            const value
+            of Object.values(
+              material
+            )
+          ) {
+
+            if (
+              value &&
+              value.isTexture
+            ) {
+
+              value.dispose();
+            }
+          }
+
+
+          material.dispose();
+        }
+      }
+    );
+
+
+    modelAnchor.remove(
+      loadedModel
+    );
+  }
+
+
+  loadedModel =
+    null;
+
+
+  mixer =
+    null;
+
+
+  activeAction =
+    null;
+
+
+  modelAnchor.visible =
+    false;
+}
+
+
+/* =========================================================
+   MODEL DEBUG RESET
+========================================================= */
+
+function resetModelDebug() {
 
   glbLoadStatus.textContent =
     "Loading...";
+
+
+  meshStatus.textContent =
+    "Waiting...";
+
+
+  materialStatus.textContent =
+    "Waiting...";
+
+
+  bboxStatus.textContent =
+    "Waiting...";
+
+
+  sizeStatus.textContent =
+    "Waiting...";
+
+
+  animationStatus.textContent =
+    "Waiting...";
+
+
+  clipStatus.textContent =
+    "Waiting...";
+
+
+  selectedClipStatus.textContent =
+    "None";
+}
+
+
+/* =========================================================
+   LOAD MODEL FROM REGISTRY
+========================================================= */
+
+function loadActiveModel() {
+
+  const config =
+    getModelConfig(
+      activeModelId
+    );
+
+
+  if (!config) {
+
+    setError(
+      new Error(
+        `Unknown model ID: ${activeModelId}`
+      )
+    );
+
+
+    return;
+  }
+
+
+  activeModelConfig =
+    config;
+
+
+  activeModelStatus.textContent =
+    config.name;
+
+
+  behaviorStatus.textContent =
+    config.behavior;
+
+
+  glbPathStatus.textContent =
+    config.path;
+
+
+  resetModelDebug();
+
+
+  setStatus(
+    `Loading ${config.name}...`
+  );
+
+
+  disposeLoadedModel();
 
 
   const loader =
@@ -617,300 +870,17 @@ function loadGLB() {
 
   loader.load(
 
-    MODEL_PATH,
+    config.path,
 
 
-    (gltf) => {
+    gltf => {
 
       try {
 
-        if (!gltf.scene) {
-
-          throw new Error(
-            "GLB has no scene"
-          );
-        }
-
-
-        let meshCount =
-          0;
-
-
-        const materials =
-          new Set();
-
-
-        gltf.scene.traverse(
-          (object) => {
-
-            if (!object.isMesh) {
-
-              return;
-            }
-
-
-            meshCount++;
-
-
-            object.frustumCulled =
-              false;
-
-
-            if (!object.material) {
-
-              return;
-            }
-
-
-            if (
-              Array.isArray(
-                object.material
-              )
-            ) {
-
-              for (
-                const material
-                of object.material
-              ) {
-
-                materials.add(
-                  material
-                );
-              }
-
-            } else {
-
-              materials.add(
-                object.material
-              );
-            }
-          }
+        validateAndAttachModel(
+          gltf,
+          config
         );
-
-
-        meshStatus.textContent =
-          String(
-            meshCount
-          );
-
-
-        materialStatus.textContent =
-          String(
-            materials.size
-          );
-
-
-        if (
-          meshCount === 0
-        ) {
-
-          throw new Error(
-            "GLB contains no mesh"
-          );
-        }
-
-
-        const box =
-          new THREE.Box3()
-            .setFromObject(
-              gltf.scene
-            );
-
-
-        if (
-          box.isEmpty()
-        ) {
-
-          bboxStatus.textContent =
-            "EMPTY";
-
-
-          throw new Error(
-            "GLB bounding box is empty"
-          );
-        }
-
-
-        const size =
-          new THREE.Vector3();
-
-
-        const center =
-          new THREE.Vector3();
-
-
-        box.getSize(
-          size
-        );
-
-
-        box.getCenter(
-          center
-        );
-
-
-        bboxStatus.textContent =
-          "Valid";
-
-
-        sizeStatus.textContent =
-          `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
-
-
-        console.log(
-          "[GLB Size]",
-          size
-        );
-
-
-        console.log(
-          "[GLB Center]",
-          center
-        );
-
-
-        loadedModel =
-          gltf.scene;
-
-
-        loadedModel.position.set(
-          -center.x,
-          -center.y,
-          -center.z
-        );
-
-
-        const maxDimension =
-          Math.max(
-            size.x,
-            size.y,
-            size.z
-          );
-
-
-        if (
-          maxDimension <= 0 ||
-          !Number.isFinite(
-            maxDimension
-          )
-        ) {
-
-          throw new Error(
-            "Invalid GLB dimensions"
-          );
-        }
-
-
-        loadedModel.scale.setScalar(
-          1 / maxDimension
-        );
-
-
-        loadedModel.rotation.set(
-          MODEL_ROTATION_X,
-          MODEL_ROTATION_Y,
-          MODEL_ROTATION_Z
-        );
-
-
-        modelAnchor.add(
-          loadedModel
-        );
-
-
-        const animations =
-          gltf.animations || [];
-
-
-        animationStatus.textContent =
-          String(
-            animations.length
-          );
-
-
-        const clipNames =
-          animations.map(
-            (clip, index) =>
-              clip.name ||
-              `Clip ${index}`
-          );
-
-
-        clipStatus.textContent =
-          clipNames.length > 0
-            ? clipNames.join(", ")
-            : "None";
-
-
-        console.log(
-          "[GLB Animation Clips]",
-          clipNames
-        );
-
-
-        if (
-          animations.length > 0
-        ) {
-
-          const selectedClip =
-            animations[0];
-
-
-          console.log(
-            "[GLB Selected Animation]",
-            selectedClip.name
-          );
-
-
-          mixer =
-            new THREE.AnimationMixer(
-              loadedModel
-            );
-
-
-          activeAction =
-            mixer.clipAction(
-              selectedClip
-            );
-
-
-          activeAction.reset();
-
-
-          activeAction.setLoop(
-            THREE.LoopRepeat,
-            Infinity
-          );
-
-
-          activeAction.play();
-
-        } else {
-
-          console.log(
-            "[GLB] No embedded animation"
-          );
-        }
-
-
-        modelAnchor.visible =
-          false;
-
-
-        glbLoadStatus.textContent =
-          "PASS";
-
-
-        errorStatus.textContent =
-          "None";
-
-
-        setStatus(
-          "GLB ready"
-        );
-
-
-        updateStartButton();
 
       } catch (error) {
 
@@ -924,16 +894,17 @@ function loadGLB() {
 
 
         setStatus(
-          "GLB validation failed"
+          `${config.name} validation failed`
         );
       }
     },
 
 
-    (progress) => {
+    progress => {
 
       if (
-        progress.total > 0
+        progress.total >
+        0
       ) {
 
         const percent =
@@ -957,7 +928,13 @@ function loadGLB() {
     },
 
 
-    () => {
+    error => {
+
+      console.error(
+        "[GLB Loader]",
+        error
+      );
+
 
       glbLoadStatus.textContent =
         "FAILED";
@@ -965,13 +942,13 @@ function loadGLB() {
 
       setError(
         new Error(
-          "Unable to load GLB"
+          `Unable to load ${config.path}`
         )
       );
 
 
       setStatus(
-        "GLB load failed"
+        `${config.name} load failed`
       );
     }
   );
@@ -979,22 +956,459 @@ function loadGLB() {
 
 
 /* =========================================================
-   READY CHECK
+   GLB VALIDATION
+
+   Every model must pass:
+   mesh
+   material
+   bounding box
+   size
+   animations
 ========================================================= */
 
-function updateStartButton() {
+function validateAndAttachModel(
+  gltf,
+  config
+) {
 
-  const ready =
-    Boolean(
-      poseLandmarker &&
-      imageSegmenter &&
-      renderer &&
-      loadedModel
+  if (
+    !gltf.scene
+  ) {
+
+    throw new Error(
+      "GLB has no scene"
+    );
+  }
+
+
+  let meshCount =
+    0;
+
+
+  const materials =
+    new Set();
+
+
+  gltf.scene.traverse(
+    object => {
+
+      if (
+        !object.isMesh
+      ) {
+
+        return;
+      }
+
+
+      meshCount++;
+
+
+      object.frustumCulled =
+        false;
+
+
+      if (
+        !object.material
+      ) {
+
+        return;
+      }
+
+
+      if (
+        Array.isArray(
+          object.material
+        )
+      ) {
+
+        for (
+          const material
+          of object.material
+        ) {
+
+          materials.add(
+            material
+          );
+        }
+
+      } else {
+
+        materials.add(
+          object.material
+        );
+      }
+    }
+  );
+
+
+  meshStatus.textContent =
+    String(
+      meshCount
     );
 
 
+  materialStatus.textContent =
+    String(
+      materials.size
+    );
+
+
+  if (
+    meshCount === 0
+  ) {
+
+    throw new Error(
+      "GLB contains no mesh"
+    );
+  }
+
+
+  const box =
+    new THREE.Box3()
+      .setFromObject(
+        gltf.scene
+      );
+
+
+  if (
+    box.isEmpty()
+  ) {
+
+    bboxStatus.textContent =
+      "EMPTY";
+
+
+    throw new Error(
+      "GLB bounding box is empty"
+    );
+  }
+
+
+  const size =
+    new THREE.Vector3();
+
+
+  const center =
+    new THREE.Vector3();
+
+
+  box.getSize(
+    size
+  );
+
+
+  box.getCenter(
+    center
+  );
+
+
+  if (
+    !Number.isFinite(
+      size.x
+    ) ||
+    !Number.isFinite(
+      size.y
+    ) ||
+    !Number.isFinite(
+      size.z
+    )
+  ) {
+
+    throw new Error(
+      "Invalid GLB bounding box"
+    );
+  }
+
+
+  bboxStatus.textContent =
+    "Valid";
+
+
+  sizeStatus.textContent =
+    `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
+
+
+  console.log(
+    `[${config.name}] Bounding Box`,
+    box
+  );
+
+
+  console.log(
+    `[${config.name}] Size`,
+    size
+  );
+
+
+  console.log(
+    `[${config.name}] Meshes`,
+    meshCount
+  );
+
+
+  console.log(
+    `[${config.name}] Materials`,
+    materials.size
+  );
+
+
+  const maxDimension =
+    Math.max(
+      size.x,
+      size.y,
+      size.z
+    );
+
+
+  if (
+    maxDimension <= 0 ||
+    !Number.isFinite(
+      maxDimension
+    )
+  ) {
+
+    throw new Error(
+      "Invalid GLB dimensions"
+    );
+  }
+
+
+  loadedModel =
+    gltf.scene;
+
+
+  loadedModel.position.set(
+    -center.x,
+    -center.y,
+    -center.z
+  );
+
+
+  /*
+    Normalize GLB before body-relative scale.
+  */
+
+  loadedModel.scale.setScalar(
+    1 /
+    maxDimension
+  );
+
+
+  loadedModel.rotation.set(
+    config.rotation?.x ||
+      0,
+
+    config.rotation?.y ||
+      0,
+
+    config.rotation?.z ||
+      0
+  );
+
+
+  modelAnchor.add(
+    loadedModel
+  );
+
+
+  /* -----------------------------------------
+     Animation inspection
+  ----------------------------------------- */
+
+  const animations =
+    gltf.animations ||
+    [];
+
+
+  animationStatus.textContent =
+    String(
+      animations.length
+    );
+
+
+  const clipNames =
+    animations.map(
+      (
+        clip,
+        index
+      ) => {
+
+        return (
+          clip.name ||
+          `Clip ${index}`
+        );
+      }
+    );
+
+
+  clipStatus.textContent =
+    clipNames.length >
+    0
+      ? clipNames.join(
+          ", "
+        )
+      : "None";
+
+
+  console.log(
+    `[${config.name}] Animation Clips`,
+    clipNames
+  );
+
+
+  selectedClipStatus.textContent =
+    "None";
+
+
+  if (
+    animations.length >
+    0
+  ) {
+
+    const requestedIndex =
+      Number.isInteger(
+        config.animationIndex
+      )
+        ? config.animationIndex
+        : 0;
+
+
+    if (
+      requestedIndex <
+        0 ||
+      requestedIndex >=
+        animations.length
+    ) {
+
+      throw new Error(
+        `animationIndex ${requestedIndex} is invalid. Available clips: ${clipNames.join(", ")}`
+      );
+    }
+
+
+    const selectedClip =
+      animations[
+        requestedIndex
+      ];
+
+
+    selectedClipStatus.textContent =
+      selectedClip.name ||
+      `Clip ${requestedIndex}`;
+
+
+    console.log(
+      `[${config.name}] Selected Animation`,
+      selectedClip.name ||
+      `Clip ${requestedIndex}`
+    );
+
+
+    mixer =
+      new THREE.AnimationMixer(
+        loadedModel
+      );
+
+
+    activeAction =
+      mixer.clipAction(
+        selectedClip
+      );
+
+
+    activeAction.reset();
+
+
+    activeAction.setLoop(
+      THREE.LoopRepeat,
+      Infinity
+    );
+
+
+    activeAction.play();
+  }
+
+
+  modelAnchor.visible =
+    false;
+
+
+  glbLoadStatus.textContent =
+    "PASS";
+
+
+  clearError();
+
+
+  setStatus(
+    `${config.name} ready`
+  );
+
+
+  updateControls();
+}
+
+
+/* =========================================================
+   READY
+========================================================= */
+
+function systemReady() {
+
+  return Boolean(
+    poseLandmarker &&
+    imageSegmenter &&
+    renderer &&
+    loadedModel &&
+    activeModelConfig
+  );
+}
+
+
+function updateControls() {
+
+  const ready =
+    systemReady();
+
+
   startButton.disabled =
-    !ready;
+    !ready ||
+    cameraRunning;
+
+
+  modelSelector.disabled =
+    MODEL_REGISTRY.length ===
+    0;
+
+
+  if (
+    cameraRunning
+  ) {
+
+    switchButton.disabled =
+      false;
+
+
+    captureButton.disabled =
+      false;
+
+
+    stopButton.disabled =
+      false;
+
+  } else {
+
+    switchButton.disabled =
+      true;
+
+
+    captureButton.disabled =
+      true;
+
+
+    stopButton.disabled =
+      true;
+  }
 
 
   if (
@@ -1110,11 +1524,10 @@ async function initializeMediaPipe() {
       "Pose Ready | Seg Ready";
 
 
-    errorStatus.textContent =
-      "None";
+    clearError();
 
 
-    updateStartButton();
+    updateControls();
 
   } catch (error) {
 
@@ -1144,28 +1557,18 @@ async function initializeMediaPipe() {
 
 function updateCameraDisplay() {
 
-  if (
-    facingMode === "user"
-  ) {
-
-    video.style.transform =
-      "scaleX(-1)";
-
-  } else {
-
-    video.style.transform =
-      "none";
-  }
+  video.style.transform =
+    facingMode ===
+    "user"
+      ? "scaleX(-1)"
+      : "none";
 }
 
 
 async function startCamera() {
 
   if (
-    !poseLandmarker ||
-    !imageSegmenter ||
-    !renderer ||
-    !loadedModel
+    !systemReady()
   ) {
 
     setStatus(
@@ -1177,17 +1580,14 @@ async function startCamera() {
   }
 
 
-  errorStatus.textContent =
-    "None";
-
-
-  startButton.disabled =
-    true;
+  clearError();
 
 
   try {
 
-    if (stream) {
+    if (
+      stream
+    ) {
 
       stopStream();
     }
@@ -1263,19 +1663,8 @@ async function startCamera() {
 
     resizeOverlay();
 
+
     resizeThree();
-
-
-    switchButton.disabled =
-      false;
-
-
-    captureButton.disabled =
-      false;
-
-
-    stopButton.disabled =
-      false;
 
 
     lastVideoTime =
@@ -1319,8 +1708,11 @@ async function startCamera() {
 
 
     setStatus(
-      "M7 Capture Photo running"
+      `M8.1 ${activeModelConfig.name} running`
     );
+
+
+    updateControls();
 
 
     predictPose();
@@ -1341,7 +1733,7 @@ async function startCamera() {
     );
 
 
-    updateStartButton();
+    updateControls();
   }
 }
 
@@ -1357,7 +1749,8 @@ function stopStream() {
 
 
   if (
-    animationFrameId !== null
+    animationFrameId !==
+    null
   ) {
 
     cancelAnimationFrame(
@@ -1370,7 +1763,9 @@ function stopStream() {
   }
 
 
-  if (stream) {
+  if (
+    stream
+  ) {
 
     for (
       const track
@@ -1458,19 +1853,7 @@ function stopStream() {
     "Camera stopped";
 
 
-  switchButton.disabled =
-    true;
-
-
-  captureButton.disabled =
-    true;
-
-
-  stopButton.disabled =
-    true;
-
-
-  updateStartButton();
+  updateControls();
 }
 
 
@@ -1488,7 +1871,8 @@ function stopCamera() {
 async function switchCamera() {
 
   facingMode =
-    facingMode === "user"
+    facingMode ===
+    "user"
       ? "environment"
       : "user";
 
@@ -1497,6 +1881,74 @@ async function switchCamera() {
 
 
   await startCamera();
+}
+
+
+/* =========================================================
+   MODEL SWITCHING
+========================================================= */
+
+async function changeModel(
+  modelId
+) {
+
+  if (
+    modelId ===
+    activeModelId &&
+    loadedModel
+  ) {
+
+    return;
+  }
+
+
+  const config =
+    getModelConfig(
+      modelId
+    );
+
+
+  if (!config) {
+
+    setError(
+      new Error(
+        `Model not found: ${modelId}`
+      )
+    );
+
+
+    return;
+  }
+
+
+  /*
+    เพื่อ isolate model loading:
+    ถ้ากล้องกำลังทำงานอยู่ ให้หยุดก่อน
+
+    M8.2 ค่อยทำ hot-swap ขณะ camera running
+  */
+
+  const cameraWasRunning =
+    cameraRunning;
+
+
+  if (
+    cameraWasRunning
+  ) {
+
+    stopStream();
+  }
+
+
+  activeModelId =
+    modelId;
+
+
+  modelSelector.value =
+    modelId;
+
+
+  loadActiveModel();
 }
 
 
@@ -1511,7 +1963,8 @@ function resizeOverlay() {
 
 
   const dpr =
-    window.devicePixelRatio || 1;
+    window.devicePixelRatio ||
+    1;
 
 
   overlay.width =
@@ -1561,8 +2014,10 @@ function resizeThree() {
 
 
   if (
-    rect.width <= 0 ||
-    rect.height <= 0
+    rect.width <=
+      0 ||
+    rect.height <=
+      0
   ) {
 
     return;
@@ -1681,13 +2136,15 @@ function getCoverTransform() {
       (
         renderedWidth -
         displayWidth
-      ) / 2,
+      ) /
+      2,
 
     cropY:
       (
         renderedHeight -
         displayHeight
-      ) / 2
+      ) /
+      2
   };
 }
 
@@ -1704,7 +2161,9 @@ function landmarkToCanvas(
     getCoverTransform();
 
 
-  if (!transform) {
+  if (
+    !transform
+  ) {
 
     return {
       x: 0,
@@ -1724,7 +2183,8 @@ function landmarkToCanvas(
 
 
   if (
-    facingMode === "user"
+    facingMode ===
+    "user"
   ) {
 
     sourceX =
@@ -1794,8 +2254,10 @@ function distance2D(
 
 
   return Math.sqrt(
-    dx * dx +
-    dy * dy
+    dx *
+    dx +
+    dy *
+    dy
   );
 }
 
@@ -1804,7 +2266,9 @@ function landmarkReliable(
   landmark
 ) {
 
-  if (!landmark) {
+  if (
+    !landmark
+  ) {
 
     return false;
   }
@@ -1856,7 +2320,8 @@ function smoothStep(
     t *
     (
       3 -
-      2 * t
+      2 *
+      t
     )
   );
 }
@@ -1909,7 +2374,9 @@ function updateTrackedBody(
     );
 
 
-  if (!reliable) {
+  if (
+    !reliable
+  ) {
 
     trackedBody.valid =
       false;
@@ -1953,14 +2420,16 @@ function updateTrackedBody(
       (
         ls.x +
         rs.x
-      ) / 2,
+      ) /
+      2,
 
 
     y:
       (
         ls.y +
         rs.y
-      ) / 2
+      ) /
+      2
   };
 
 
@@ -1970,14 +2439,16 @@ function updateTrackedBody(
       (
         lh.x +
         rh.x
-      ) / 2,
+      ) /
+      2,
 
 
     y:
       (
         lh.y +
         rh.y
-      ) / 2
+      ) /
+      2
   };
 
 
@@ -1987,14 +2458,16 @@ function updateTrackedBody(
       (
         shoulderCenter.x +
         hipCenter.x
-      ) / 2,
+      ) /
+      2,
 
 
     y:
       (
         shoulderCenter.y +
         hipCenter.y
-      ) / 2
+      ) /
+      2
   };
 
 
@@ -2034,7 +2507,7 @@ function updateTrackedBody(
 
 
 /* =========================================================
-   SEGMENTATION REQUEST
+   SEGMENTATION
 ========================================================= */
 
 function requestSegmentation(
@@ -2045,7 +2518,8 @@ function requestSegmentation(
     !imageSegmenter ||
     segmentationBusy ||
     !trackedBody.valid ||
-    video.readyState < 2
+    video.readyState <
+      2
   ) {
 
     return;
@@ -2054,7 +2528,7 @@ function requestSegmentation(
 
   if (
     timestamp -
-    lastSegmentationTime <
+      lastSegmentationTime <
     SEGMENTATION_INTERVAL_MS
   ) {
 
@@ -2091,10 +2565,6 @@ function requestSegmentation(
 }
 
 
-/* =========================================================
-   SEGMENTATION RESULT
-========================================================= */
-
 function handleSegmentationResult(
   result
 ) {
@@ -2104,7 +2574,8 @@ function handleSegmentationResult(
     if (
       !result ||
       !result.confidenceMasks ||
-      result.confidenceMasks.length === 0
+      result.confidenceMasks.length ===
+        0
     ) {
 
       segmentationMaskReady =
@@ -2116,7 +2587,9 @@ function handleSegmentationResult(
 
 
     const mask =
-      result.confidenceMasks[0];
+      result.confidenceMasks[
+        0
+      ];
 
 
     const width =
@@ -2134,7 +2607,7 @@ function handleSegmentationResult(
     if (
       !previousMaskValues ||
       previousMaskValues.length !==
-      currentValues.length
+        currentValues.length
     ) {
 
       previousMaskValues =
@@ -2150,27 +2623,37 @@ function handleSegmentationResult(
     } else {
 
       for (
-        let i = 0;
-        i < currentValues.length;
+        let i =
+          0;
+        i <
+        currentValues.length;
         i++
       ) {
 
-        previousMaskValues[i] =
-          previousMaskValues[i] *
+        previousMaskValues[
+          i
+        ] =
+          previousMaskValues[
+            i
+          ] *
           (
             1 -
             MASK_TEMPORAL_ALPHA
           )
           +
-          currentValues[i] *
+          currentValues[
+            i
+          ] *
           MASK_TEMPORAL_ALPHA;
       }
     }
 
 
     if (
-      maskCanvas.width !== width ||
-      maskCanvas.height !== height
+      maskCanvas.width !==
+        width ||
+      maskCanvas.height !==
+        height
     ) {
 
       maskCanvas.width =
@@ -2195,13 +2678,17 @@ function handleSegmentationResult(
 
 
     for (
-      let i = 0;
-      i < previousMaskValues.length;
+      let i =
+        0;
+      i <
+        previousMaskValues.length;
       i++
     ) {
 
       const confidence =
-        previousMaskValues[i];
+        previousMaskValues[
+          i
+        ];
 
 
       const alpha =
@@ -2217,24 +2704,29 @@ function handleSegmentationResult(
         255;
 
 
-      rgba[targetIndex] =
-        255;
-
-
       rgba[
-        targetIndex + 1
+        targetIndex
       ] =
         255;
 
 
       rgba[
-        targetIndex + 2
+        targetIndex +
+        1
       ] =
         255;
 
 
       rgba[
-        targetIndex + 3
+        targetIndex +
+        2
+      ] =
+        255;
+
+
+      rgba[
+        targetIndex +
+        3
       ] =
         alpha;
 
@@ -2288,15 +2780,17 @@ function handleSegmentationResult(
 
 
 /* =========================================================
-   DRAW COVER SOURCE
+   DRAW COVER
 ========================================================= */
 
 function drawCoverSource(
   targetContext,
   source,
   transform,
-  expansion = 1,
-  mirror = true
+  expansion =
+    1,
+  mirror =
+    true
 ) {
 
   targetContext.save();
@@ -2330,17 +2824,20 @@ function drawCoverSource(
 
   const drawX =
     -transform.cropX -
-    extraWidth / 2;
+    extraWidth /
+    2;
 
 
   const drawY =
     -transform.cropY -
-    extraHeight / 2;
+    extraHeight /
+    2;
 
 
   if (
     mirror &&
-    facingMode === "user"
+    facingMode ===
+      "user"
   ) {
 
     targetContext.translate(
@@ -2357,10 +2854,15 @@ function drawCoverSource(
 
 
   targetContext.drawImage(
+
     source,
+
     drawX,
+
     drawY,
+
     drawWidth,
+
     drawHeight
   );
 
@@ -2370,10 +2872,7 @@ function drawCoverSource(
 
 
 /* =========================================================
-   BUILD HUMAN OCCLUSION LAYER
-
-   This canvas contains ONLY:
-   camera pixels belonging to the detected person.
+   OCCLUSION
 ========================================================= */
 
 function buildHumanOcclusionLayer() {
@@ -2390,25 +2889,11 @@ function buildHumanOcclusionLayer() {
     getCoverTransform();
 
 
-  if (!transform) {
-
-    return false;
-  }
-
-
   if (
-    compositeCanvas.width !==
-    overlay.width ||
-    compositeCanvas.height !==
-    overlay.height
+    !transform
   ) {
 
-    compositeCanvas.width =
-      overlay.width;
-
-
-    compositeCanvas.height =
-      overlay.height;
+    return false;
   }
 
 
@@ -2454,25 +2939,20 @@ function buildHumanOcclusionLayer() {
 }
 
 
-/* =========================================================
-   SCREEN OCCLUSION
-========================================================= */
-
 function drawFullHumanOcclusion() {
 
   if (
-    orbitDepth >= 0
+    orbitDepth >=
+    0
   ) {
 
     return;
   }
 
 
-  const ready =
-    buildHumanOcclusionLayer();
-
-
-  if (!ready) {
+  if (
+    !buildHumanOcclusionLayer()
+  ) {
 
     return;
   }
@@ -2487,15 +2967,16 @@ function drawFullHumanOcclusion() {
 
 
 /* =========================================================
-   ORBIT
+   BEHAVIOR — ORBIT
 ========================================================= */
 
-function updateOrbit(
+function updateOrbitBehavior(
   delta
 ) {
 
   if (
-    !trackedBody.valid
+    !trackedBody.valid ||
+    !activeModelConfig
   ) {
 
     modelAnchor.visible =
@@ -2513,11 +2994,13 @@ function updateOrbit(
 
   if (
     orbitAngle >
-    Math.PI * 2
+    Math.PI *
+    2
   ) {
 
     orbitAngle -=
-      Math.PI * 2;
+      Math.PI *
+      2;
   }
 
 
@@ -2535,7 +3018,8 @@ function updateOrbit(
 
   const orbitY =
     Math.sin(
-      orbitAngle * 2
+      orbitAngle *
+      2
     );
 
 
@@ -2570,16 +3054,23 @@ function updateOrbit(
   const bodyReference =
     (
       trackedBody.shoulderWidth *
-      0.65 +
-
+      0.65
+      +
       trackedBody.torsoHeight *
       0.35
     );
 
 
+  /*
+    IMPORTANT:
+    scaleMultiplier now comes
+    from the active model config.
+  */
+
   const baseScale =
     bodyReference *
-    MODEL_SCALE_MULTIPLIER;
+    activeModelConfig
+      .scaleMultiplier;
 
 
   const depthMultiplier =
@@ -2595,6 +3086,7 @@ function updateOrbit(
       depthMultiplier,
 
       0.05,
+
       1.2
     );
 
@@ -2647,9 +3139,13 @@ function updateOrbit(
 
 
     const targetRotationY =
-      movementX >= 0
-        ? Math.PI / 2
-        : -Math.PI / 2;
+      movementX >=
+      0
+        ? Math.PI /
+          2
+
+        : -Math.PI /
+          2;
 
 
     modelAnchor.rotation.y =
@@ -2664,7 +3160,8 @@ function updateOrbit(
 
   const targetBank =
     THREE.MathUtils.degToRad(
-      -orbitX * 12
+      -orbitX *
+      12
     );
 
 
@@ -2682,7 +3179,8 @@ function updateOrbit(
 
 
   const depthLabel =
-    orbitDepth >= 0
+    orbitDepth >=
+    0
       ? "FRONT"
       : "BACK";
 
@@ -2694,7 +3192,58 @@ function updateOrbit(
 
 
   anchorStatus.textContent =
-    `ORBIT ${depthLabel} | ${maskLabel} | scale ${smoothScale.toFixed(3)}`;
+    `${activeModelConfig.name} | ORBIT ${depthLabel} | ${maskLabel} | scale ${smoothScale.toFixed(3)}`;
+}
+
+
+/* =========================================================
+   BEHAVIOR ROUTER
+
+   Future:
+   ORBIT
+   BESIDE
+   SHOULDER
+   STATIC
+========================================================= */
+
+function updateModelBehavior(
+  delta
+) {
+
+  if (
+    !activeModelConfig
+  ) {
+
+    modelAnchor.visible =
+      false;
+
+
+    return;
+  }
+
+
+  switch (
+    activeModelConfig.behavior
+  ) {
+
+    case "ORBIT":
+
+      updateOrbitBehavior(
+        delta
+      );
+
+      break;
+
+
+    default:
+
+      modelAnchor.visible =
+        false;
+
+
+      anchorStatus.textContent =
+        `Unsupported behavior: ${activeModelConfig.behavior}`;
+  }
 }
 
 
@@ -2720,7 +3269,8 @@ function drawLine(
 
 
   const dpr =
-    window.devicePixelRatio || 1;
+    window.devicePixelRatio ||
+    1;
 
 
   ctx.beginPath();
@@ -2743,7 +3293,8 @@ function drawLine(
 
 
   ctx.lineWidth =
-    2 * dpr;
+    2 *
+    dpr;
 
 
   ctx.stroke();
@@ -2761,7 +3312,8 @@ function drawPoint(
 
 
   const dpr =
-    window.devicePixelRatio || 1;
+    window.devicePixelRatio ||
+    1;
 
 
   ctx.beginPath();
@@ -2770,9 +3322,11 @@ function drawPoint(
   ctx.arc(
     point.x,
     point.y,
-    4 * dpr,
+    4 *
+    dpr,
     0,
-    Math.PI * 2
+    Math.PI *
+    2
   );
 
 
@@ -2858,7 +3412,7 @@ function drawPoseDebug(
 
 
 /* =========================================================
-   SCREEN OVERLAY
+   OVERLAY
 ========================================================= */
 
 function drawOverlay() {
@@ -2878,13 +3432,6 @@ function drawOverlay() {
   drawFullHumanOcclusion();
 
 
-  /*
-    Debug stays visible on screen.
-
-    IMPORTANT:
-    Debug is NOT drawn into captureCanvas.
-  */
-
   drawPoseDebug(
     latestLandmarks
   );
@@ -2892,7 +3439,7 @@ function drawOverlay() {
 
 
 /* =========================================================
-   M7 CAPTURE PHOTO
+   CAPTURE
 ========================================================= */
 
 async function capturePhoto() {
@@ -2900,7 +3447,8 @@ async function capturePhoto() {
   if (
     !cameraRunning ||
     !renderer ||
-    video.readyState < 2
+    video.readyState <
+      2
   ) {
 
     captureStatus.textContent =
@@ -2925,7 +3473,9 @@ async function capturePhoto() {
       getCoverTransform();
 
 
-    if (!transform) {
+    if (
+      !transform
+    ) {
 
       throw new Error(
         "Capture transform unavailable"
@@ -2949,10 +3499,7 @@ async function capturePhoto() {
     );
 
 
-    /* ---------------------------------
-       LAYER 1
-       Camera
-    --------------------------------- */
+    /* CAMERA */
 
     captureCtx.globalCompositeOperation =
       "source-over";
@@ -2967,12 +3514,7 @@ async function capturePhoto() {
     );
 
 
-    /* ---------------------------------
-       LAYER 2
-       Three.js / GLB
-
-       Render a fresh frame first.
-    --------------------------------- */
+    /* THREE */
 
     renderer.render(
       scene,
@@ -2989,23 +3531,17 @@ async function capturePhoto() {
     );
 
 
-    /* ---------------------------------
-       LAYER 3
-       Human occlusion
-
-       Only when GLB is on BACK half.
-    --------------------------------- */
+    /* HUMAN OCCLUSION */
 
     if (
-      orbitDepth < 0 &&
+      orbitDepth <
+        0 &&
       segmentationMaskReady
     ) {
 
-      const occlusionReady =
-        buildHumanOcclusionLayer();
-
-
-      if (occlusionReady) {
+      if (
+        buildHumanOcclusionLayer()
+      ) {
 
         captureCtx.drawImage(
           compositeCanvas,
@@ -3018,13 +3554,9 @@ async function capturePhoto() {
     }
 
 
-    /* ---------------------------------
-       Export JPG
-    --------------------------------- */
-
     const blob =
       await new Promise(
-        (resolve) => {
+        resolve => {
 
           captureCanvas.toBlob(
             resolve,
@@ -3035,7 +3567,9 @@ async function capturePhoto() {
       );
 
 
-    if (!blob) {
+    if (
+      !blob
+    ) {
 
       throw new Error(
         "Unable to create capture image"
@@ -3069,7 +3603,7 @@ async function capturePhoto() {
 
 
     link.download =
-      `human-ar-${timestamp}.jpg`;
+      `human-ar-${activeModelId}-${timestamp}.jpg`;
 
 
     document.body.appendChild(
@@ -3099,13 +3633,8 @@ async function capturePhoto() {
       "PASS — Photo captured";
 
 
-    errorStatus.textContent =
-      "None";
+    clearError();
 
-
-    setStatus(
-      "M7 photo captured"
-    );
 
   } catch (error) {
 
@@ -3115,11 +3644,6 @@ async function capturePhoto() {
 
     setError(
       error
-    );
-
-
-    setStatus(
-      "Capture failed"
     );
 
   } finally {
@@ -3159,7 +3683,8 @@ function predictPose() {
       (
         now -
         lastFrameTimestamp
-      ) / 1000,
+      ) /
+      1000,
       0.1
     );
 
@@ -3168,7 +3693,9 @@ function predictPose() {
     now;
 
 
-  if (mixer) {
+  if (
+    mixer
+  ) {
 
     mixer.update(
       delta
@@ -3177,9 +3704,10 @@ function predictPose() {
 
 
   if (
-    video.readyState >= 2 &&
+    video.readyState >=
+      2 &&
     video.currentTime !==
-    lastVideoTime
+      lastVideoTime
   ) {
 
     lastVideoTime =
@@ -3197,7 +3725,8 @@ function predictPose() {
 
       if (
         result.landmarks &&
-        result.landmarks.length > 0
+        result.landmarks.length >
+          0
       ) {
 
         personStatus.textContent =
@@ -3205,7 +3734,9 @@ function predictPose() {
 
 
         latestLandmarks =
-          result.landmarks[0];
+          result.landmarks[
+            0
+          ];
 
 
         updateTrackedBody(
@@ -3268,7 +3799,7 @@ function predictPose() {
   }
 
 
-  updateOrbit(
+  updateModelBehavior(
     delta
   );
 
@@ -3317,6 +3848,17 @@ stopButton.addEventListener(
 );
 
 
+modelSelector.addEventListener(
+  "change",
+  event => {
+
+    changeModel(
+      event.target.value
+    );
+  }
+);
+
+
 video.addEventListener(
   "loadedmetadata",
   () => {
@@ -3344,7 +3886,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 7 initialized"
+  "[Human AR] Milestone 8.1 initialized"
 );
 
 
@@ -3364,11 +3906,15 @@ stopButton.disabled =
   true;
 
 
+initializeModelSelector();
+
+
 try {
 
   initializeThree();
 
-  loadGLB();
+
+  loadActiveModel();
 
 } catch (error) {
 

@@ -36,6 +36,9 @@ const startButton =
 const switchButton =
   document.querySelector("#switch-camera");
 
+const captureButton =
+  document.querySelector("#capture-photo");
+
 const stopButton =
   document.querySelector("#stop-camera");
 
@@ -81,6 +84,9 @@ const personStatus =
 const anchorStatus =
   document.querySelector("#anchor-status");
 
+const captureStatus =
+  document.querySelector("#capture-status");
+
 const errorStatus =
   document.querySelector("#error-status");
 
@@ -117,7 +123,7 @@ let latestLandmarks =
 
 
 /* =========================================================
-   SEGMENTATION STATE
+   SEGMENTATION
 ========================================================= */
 
 let segmentationBusy =
@@ -129,58 +135,28 @@ let lastSegmentationTime =
 let segmentationMaskReady =
   false;
 
+let previousMaskValues =
+  null;
 
-/*
-  เพิ่มจาก 12 FPS → 20 FPS
-
-  ถ้ามือถือเครื่องไหนหนักมาก
-  ค่อยลดกลับเป็น 15
-*/
 
 const SEGMENTATION_INTERVAL_MS =
   1000 / 20;
 
 
-/*
-  Confidence threshold
-*/
-
 const MASK_CONFIDENCE_LOW =
   0.12;
+
 
 const MASK_CONFIDENCE_HIGH =
   0.52;
 
 
-/*
-  ลดจาก 1.04 → 1.02
-  ลด halo รอบตัวคน
-*/
-
 const MASK_EXPANSION =
   1.02;
 
 
-/*
-  Temporal smoothing
-
-  ค่ายิ่งสูง = mask ใหม่มีผลเร็ว
-  ค่ายิ่งต่ำ = เนียน แต่ตาม movement ช้ากว่า
-
-  0.70 เหมาะกับกล้องมือถือทั่วไป
-*/
-
 const MASK_TEMPORAL_ALPHA =
   0.70;
-
-
-/*
-  เราจะเก็บ mask ก่อนหน้าไว้
-  แล้วผสมกับ mask ใหม่
-*/
-
-let previousMaskValues =
-  null;
 
 
 /* =========================================================
@@ -204,6 +180,17 @@ const compositeCanvas =
 
 const compositeCtx =
   compositeCanvas.getContext("2d");
+
+
+/* =========================================================
+   CAPTURE CANVAS
+========================================================= */
+
+const captureCanvas =
+  document.createElement("canvas");
+
+const captureCtx =
+  captureCanvas.getContext("2d");
 
 
 /* =========================================================
@@ -256,6 +243,9 @@ const MODEL_ROTATION_Z =
 
 /* =========================================================
    ORBIT
+
+   IMPORTANT:
+   ค่าเหล่านี้คงเดิมจาก Milestone ที่ผ่านแล้ว
 ========================================================= */
 
 const ORBIT_SPEED =
@@ -289,18 +279,21 @@ const FOLLOW_ORBIT_DIRECTION =
 const POSITION_SMOOTHING =
   12;
 
+
 const SCALE_SMOOTHING =
   9;
 
+
 const ROTATION_SMOOTHING =
   8;
+
 
 const MIN_VISIBILITY =
   0.55;
 
 
 /* =========================================================
-   LANDMARK
+   LANDMARKS
 ========================================================= */
 
 const LANDMARK = {
@@ -319,6 +312,7 @@ const LANDMARK = {
 
 let orbitAngle =
   0;
+
 
 let orbitDepth =
   0;
@@ -444,7 +438,7 @@ function dampAngle(
 
 
 /* =========================================================
-   THREE
+   THREE INITIALIZATION
 ========================================================= */
 
 function initializeThree() {
@@ -474,10 +468,25 @@ function initializeThree() {
       10;
 
 
+    /*
+      preserveDrawingBuffer = true
+
+      ทำให้ canvas ของ Three.js
+      สามารถนำไปวาดลง Capture Canvas
+      ได้อย่างเชื่อถือได้
+    */
+
     renderer =
       new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: true
+
+        alpha:
+          true,
+
+        antialias:
+          true,
+
+        preserveDrawingBuffer:
+          true
       });
 
 
@@ -589,7 +598,7 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB LOAD
+   GLB LOAD + VALIDATION
 ========================================================= */
 
 function loadGLB() {
@@ -635,6 +644,7 @@ function loadGLB() {
           (object) => {
 
             if (!object.isMesh) {
+
               return;
             }
 
@@ -647,6 +657,7 @@ function loadGLB() {
 
 
             if (!object.material) {
+
               return;
             }
 
@@ -744,6 +755,18 @@ function loadGLB() {
 
         sizeStatus.textContent =
           `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
+
+
+        console.log(
+          "[GLB Size]",
+          size
+        );
+
+
+        console.log(
+          "[GLB Center]",
+          center
+        );
 
 
         loadedModel =
@@ -861,6 +884,12 @@ function loadGLB() {
 
 
           activeAction.play();
+
+        } else {
+
+          console.log(
+            "[GLB] No embedded animation"
+          );
         }
 
 
@@ -876,6 +905,11 @@ function loadGLB() {
           "None";
 
 
+        setStatus(
+          "GLB ready"
+        );
+
+
         updateStartButton();
 
       } catch (error) {
@@ -887,11 +921,40 @@ function loadGLB() {
         setError(
           error
         );
+
+
+        setStatus(
+          "GLB validation failed"
+        );
       }
     },
 
 
-    undefined,
+    (progress) => {
+
+      if (
+        progress.total > 0
+      ) {
+
+        const percent =
+          Math.round(
+            (
+              progress.loaded /
+              progress.total
+            ) *
+            100
+          );
+
+
+        glbLoadStatus.textContent =
+          `${percent}%`;
+
+      } else {
+
+        glbLoadStatus.textContent =
+          "Loading...";
+      }
+    },
 
 
     () => {
@@ -905,13 +968,18 @@ function loadGLB() {
           "Unable to load GLB"
         )
       );
+
+
+      setStatus(
+        "GLB load failed"
+      );
     }
   );
 }
 
 
 /* =========================================================
-   READY
+   READY CHECK
 ========================================================= */
 
 function updateStartButton() {
@@ -929,7 +997,10 @@ function updateStartButton() {
     !ready;
 
 
-  if (ready) {
+  if (
+    ready &&
+    !cameraRunning
+  ) {
 
     setStatus(
       "Ready — Start Camera"
@@ -1056,6 +1127,11 @@ async function initializeMediaPipe() {
     );
 
 
+    setStatus(
+      "MediaPipe initialization failed"
+    );
+
+
     startButton.disabled =
       true;
   }
@@ -1068,10 +1144,18 @@ async function initializeMediaPipe() {
 
 function updateCameraDisplay() {
 
-  video.style.transform =
+  if (
     facingMode === "user"
-      ? "scaleX(-1)"
-      : "none";
+  ) {
+
+    video.style.transform =
+      "scaleX(-1)";
+
+  } else {
+
+    video.style.transform =
+      "none";
+  }
 }
 
 
@@ -1083,6 +1167,11 @@ async function startCamera() {
     !renderer ||
     !loadedModel
   ) {
+
+    setStatus(
+      "System is not ready"
+    );
+
 
     return;
   }
@@ -1168,12 +1257,20 @@ async function startCamera() {
       "Running";
 
 
+    captureStatus.textContent =
+      "Ready";
+
+
     resizeOverlay();
 
     resizeThree();
 
 
     switchButton.disabled =
+      false;
+
+
+    captureButton.disabled =
       false;
 
 
@@ -1222,7 +1319,7 @@ async function startCamera() {
 
 
     setStatus(
-      "M6.4A Segmentation Stabilization running"
+      "M7 Capture Photo running"
     );
 
 
@@ -1230,8 +1327,17 @@ async function startCamera() {
 
   } catch (error) {
 
+    cameraRunning =
+      false;
+
+
     setError(
       error
+    );
+
+
+    setStatus(
+      "Camera failed"
     );
 
 
@@ -1266,12 +1372,13 @@ function stopStream() {
 
   if (stream) {
 
-    stream
-      .getTracks()
-      .forEach(
-        track =>
-          track.stop()
-      );
+    for (
+      const track
+      of stream.getTracks()
+    ) {
+
+      track.stop();
+    }
   }
 
 
@@ -1315,8 +1422,13 @@ function stopStream() {
     null;
 
 
-  modelAnchor.visible =
-    false;
+  if (
+    modelAnchor
+  ) {
+
+    modelAnchor.visible =
+      false;
+  }
 
 
   clearOverlay();
@@ -1334,6 +1446,10 @@ function stopStream() {
     "Hidden";
 
 
+  captureStatus.textContent =
+    "Camera stopped";
+
+
   placeholder.style.display =
     "flex";
 
@@ -1343,6 +1459,10 @@ function stopStream() {
 
 
   switchButton.disabled =
+    true;
+
+
+  captureButton.disabled =
     true;
 
 
@@ -1357,6 +1477,11 @@ function stopStream() {
 function stopCamera() {
 
   stopStream();
+
+
+  setStatus(
+    "Camera stopped"
+  );
 }
 
 
@@ -1409,6 +1534,14 @@ function resizeOverlay() {
 
   compositeCanvas.height =
     overlay.height;
+
+
+  captureCanvas.width =
+    overlay.width;
+
+
+  captureCanvas.height =
+    overlay.height;
 }
 
 
@@ -1441,6 +1574,25 @@ function resizeThree() {
     rect.height,
     false
   );
+
+
+  threeCamera.left =
+    0;
+
+
+  threeCamera.right =
+    1;
+
+
+  threeCamera.top =
+    1;
+
+
+  threeCamera.bottom =
+    0;
+
+
+  threeCamera.updateProjectionMatrix();
 }
 
 
@@ -1456,7 +1608,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   COVER TRANSFORM
+   OBJECT-FIT COVER
 ========================================================= */
 
 function getCoverTransform() {
@@ -1479,7 +1631,9 @@ function getCoverTransform() {
 
   if (
     !sourceWidth ||
-    !sourceHeight
+    !sourceHeight ||
+    !displayWidth ||
+    !displayHeight
   ) {
 
     return null;
@@ -1488,8 +1642,12 @@ function getCoverTransform() {
 
   const scale =
     Math.max(
-      displayWidth / sourceWidth,
-      displayHeight / sourceHeight
+
+      displayWidth /
+      sourceWidth,
+
+      displayHeight /
+      sourceHeight
     );
 
 
@@ -1508,6 +1666,12 @@ function getCoverTransform() {
     sourceWidth,
 
     sourceHeight,
+
+    displayWidth,
+
+    displayHeight,
+
+    scale,
 
     renderedWidth,
 
@@ -1529,7 +1693,7 @@ function getCoverTransform() {
 
 
 /* =========================================================
-   LANDMARK MAPPING
+   LANDMARK → CANVAS
 ========================================================= */
 
 function landmarkToCanvas(
@@ -1540,9 +1704,23 @@ function landmarkToCanvas(
     getCoverTransform();
 
 
+  if (!transform) {
+
+    return {
+      x: 0,
+      y: 0
+    };
+  }
+
+
   let sourceX =
     landmark.x *
     transform.sourceWidth;
+
+
+  const sourceY =
+    landmark.y *
+    transform.sourceHeight;
 
 
   if (
@@ -1559,24 +1737,21 @@ function landmarkToCanvas(
 
     x:
       sourceX *
-      (
-        transform.renderedWidth /
-        transform.sourceWidth
-      ) -
+      transform.scale -
       transform.cropX,
 
 
     y:
-      landmark.y *
-      transform.sourceHeight *
-      (
-        transform.renderedHeight /
-        transform.sourceHeight
-      ) -
+      sourceY *
+      transform.scale -
       transform.cropY
   };
 }
 
+
+/* =========================================================
+   CANVAS → THREE
+========================================================= */
 
 function canvasToThree(
   point
@@ -1630,15 +1805,23 @@ function landmarkReliable(
 ) {
 
   if (!landmark) {
+
     return false;
   }
 
 
-  return (
+  if (
     landmark.visibility ===
-      undefined ||
+    undefined
+  ) {
+
+    return true;
+  }
+
+
+  return (
     landmark.visibility >=
-      MIN_VISIBILITY
+    MIN_VISIBILITY
   );
 }
 
@@ -1687,70 +1870,96 @@ function updateTrackedBody(
   landmarks
 ) {
 
-  const ls =
+  const leftShoulder =
     landmarks[
       LANDMARK.LEFT_SHOULDER
     ];
 
 
-  const rs =
+  const rightShoulder =
     landmarks[
       LANDMARK.RIGHT_SHOULDER
     ];
 
 
-  const lh =
+  const leftHip =
     landmarks[
       LANDMARK.LEFT_HIP
     ];
 
 
-  const rh =
+  const rightHip =
     landmarks[
       LANDMARK.RIGHT_HIP
     ];
 
 
-  if (
-    !landmarkReliable(ls) ||
-    !landmarkReliable(rs) ||
-    !landmarkReliable(lh) ||
-    !landmarkReliable(rh)
-  ) {
+  const reliable =
+    landmarkReliable(
+      leftShoulder
+    ) &&
+    landmarkReliable(
+      rightShoulder
+    ) &&
+    landmarkReliable(
+      leftHip
+    ) &&
+    landmarkReliable(
+      rightHip
+    );
+
+
+  if (!reliable) {
 
     trackedBody.valid =
       false;
+
+
+    anchorStatus.textContent =
+      "Low confidence";
 
 
     return;
   }
 
 
-  const pLS =
-    landmarkToCanvas(ls);
+  const ls =
+    landmarkToCanvas(
+      leftShoulder
+    );
 
-  const pRS =
-    landmarkToCanvas(rs);
 
-  const pLH =
-    landmarkToCanvas(lh);
+  const rs =
+    landmarkToCanvas(
+      rightShoulder
+    );
 
-  const pRH =
-    landmarkToCanvas(rh);
+
+  const lh =
+    landmarkToCanvas(
+      leftHip
+    );
+
+
+  const rh =
+    landmarkToCanvas(
+      rightHip
+    );
 
 
   const shoulderCenter = {
 
     x:
       (
-        pLS.x +
-        pRS.x
+        ls.x +
+        rs.x
       ) / 2,
+
 
     y:
       (
-        pLS.y +
-        pRS.y
+        ls.y +
+        rs.y
       ) / 2
   };
 
@@ -1759,47 +1968,54 @@ function updateTrackedBody(
 
     x:
       (
-        pLH.x +
-        pRH.x
+        lh.x +
+        rh.x
       ) / 2,
+
 
     y:
       (
-        pLH.y +
-        pRH.y
+        lh.y +
+        rh.y
       ) / 2
   };
 
 
-  const center =
-    canvasToThree({
+  const torsoCanvas = {
 
-      x:
-        (
-          shoulderCenter.x +
-          hipCenter.x
-        ) / 2,
+    x:
+      (
+        shoulderCenter.x +
+        hipCenter.x
+      ) / 2,
 
-      y:
-        (
-          shoulderCenter.y +
-          hipCenter.y
-        ) / 2
-    });
+
+    y:
+      (
+        shoulderCenter.y +
+        hipCenter.y
+      ) / 2
+  };
+
+
+  const torsoThree =
+    canvasToThree(
+      torsoCanvas
+    );
 
 
   trackedBody.centerX =
-    center.x;
+    torsoThree.x;
 
 
   trackedBody.centerY =
-    center.y;
+    torsoThree.y;
 
 
   trackedBody.shoulderWidth =
     distance2D(
-      pLS,
-      pRS
+      ls,
+      rs
     ) /
     overlay.width;
 
@@ -1826,9 +2042,9 @@ function requestSegmentation(
 ) {
 
   if (
+    !imageSegmenter ||
     segmentationBusy ||
     !trackedBody.valid ||
-    !imageSegmenter ||
     video.readyState < 2
   ) {
 
@@ -1876,7 +2092,7 @@ function requestSegmentation(
 
 
 /* =========================================================
-   TEMPORALLY SMOOTHED SEGMENTATION
+   SEGMENTATION RESULT
 ========================================================= */
 
 function handleSegmentationResult(
@@ -1886,7 +2102,9 @@ function handleSegmentationResult(
   try {
 
     if (
-      !result?.confidenceMasks?.length
+      !result ||
+      !result.confidenceMasks ||
+      result.confidenceMasks.length === 0
     ) {
 
       segmentationMaskReady =
@@ -1938,15 +2156,12 @@ function handleSegmentationResult(
       ) {
 
         previousMaskValues[i] =
-
           previousMaskValues[i] *
           (
             1 -
             MASK_TEMPORAL_ALPHA
           )
-
           +
-
           currentValues[i] *
           MASK_TEMPORAL_ALPHA;
       }
@@ -1975,7 +2190,7 @@ function handleSegmentationResult(
       );
 
 
-    let j =
+    let targetIndex =
       0;
 
 
@@ -1991,24 +2206,41 @@ function handleSegmentationResult(
 
       const alpha =
         smoothStep(
+
           MASK_CONFIDENCE_LOW,
+
           MASK_CONFIDENCE_HIGH,
+
           confidence
+
         ) *
         255;
 
 
-      rgba[j++] =
+      rgba[targetIndex] =
         255;
 
-      rgba[j++] =
+
+      rgba[
+        targetIndex + 1
+      ] =
         255;
 
-      rgba[j++] =
+
+      rgba[
+        targetIndex + 2
+      ] =
         255;
 
-      rgba[j++] =
+
+      rgba[
+        targetIndex + 3
+      ] =
         alpha;
+
+
+      targetIndex +=
+        4;
     }
 
 
@@ -2056,14 +2288,15 @@ function handleSegmentationResult(
 
 
 /* =========================================================
-   COVER DRAW
+   DRAW COVER SOURCE
 ========================================================= */
 
 function drawCoverSource(
   targetContext,
   source,
   transform,
-  expansion = 1
+  expansion = 1,
+  mirror = true
 ) {
 
   targetContext.save();
@@ -2106,11 +2339,12 @@ function drawCoverSource(
 
 
   if (
+    mirror &&
     facingMode === "user"
   ) {
 
     targetContext.translate(
-      overlay.width,
+      transform.displayWidth,
       0
     );
 
@@ -2136,17 +2370,19 @@ function drawCoverSource(
 
 
 /* =========================================================
-   FULL HUMAN OCCLUSION
+   BUILD HUMAN OCCLUSION LAYER
+
+   This canvas contains ONLY:
+   camera pixels belonging to the detected person.
 ========================================================= */
 
-function drawFullHumanOcclusion() {
+function buildHumanOcclusionLayer() {
 
   if (
-    !segmentationMaskReady ||
-    orbitDepth >= 0
+    !segmentationMaskReady
   ) {
 
-    return;
+    return false;
   }
 
 
@@ -2155,7 +2391,24 @@ function drawFullHumanOcclusion() {
 
 
   if (!transform) {
-    return;
+
+    return false;
+  }
+
+
+  if (
+    compositeCanvas.width !==
+    overlay.width ||
+    compositeCanvas.height !==
+    overlay.height
+  ) {
+
+    compositeCanvas.width =
+      overlay.width;
+
+
+    compositeCanvas.height =
+      overlay.height;
   }
 
 
@@ -2175,7 +2428,8 @@ function drawFullHumanOcclusion() {
     compositeCtx,
     video,
     transform,
-    1
+    1,
+    true
   );
 
 
@@ -2187,12 +2441,41 @@ function drawFullHumanOcclusion() {
     compositeCtx,
     maskCanvas,
     transform,
-    MASK_EXPANSION
+    MASK_EXPANSION,
+    true
   );
 
 
   compositeCtx.globalCompositeOperation =
     "source-over";
+
+
+  return true;
+}
+
+
+/* =========================================================
+   SCREEN OCCLUSION
+========================================================= */
+
+function drawFullHumanOcclusion() {
+
+  if (
+    orbitDepth >= 0
+  ) {
+
+    return;
+  }
+
+
+  const ready =
+    buildHumanOcclusionLayer();
+
+
+  if (!ready) {
+
+    return;
+  }
 
 
   ctx.drawImage(
@@ -2266,6 +2549,11 @@ function updateOrbit(
     ORBIT_RADIUS_Y;
 
 
+  const centerYOffset =
+    trackedBody.torsoHeight *
+    ORBIT_CENTER_Y;
+
+
   const targetX =
     trackedBody.centerX +
     orbitX *
@@ -2274,8 +2562,7 @@ function updateOrbit(
 
   const targetY =
     trackedBody.centerY +
-    trackedBody.torsoHeight *
-    ORBIT_CENTER_Y +
+    centerYOffset +
     orbitY *
     radiusY;
 
@@ -2290,16 +2577,22 @@ function updateOrbit(
     );
 
 
+  const baseScale =
+    bodyReference *
+    MODEL_SCALE_MULTIPLIER;
+
+
+  const depthMultiplier =
+    1 +
+    orbitDepth *
+    ORBIT_DEPTH_SCALE;
+
+
   const targetScale =
     THREE.MathUtils.clamp(
 
-      bodyReference *
-      MODEL_SCALE_MULTIPLIER *
-      (
-        1 +
-        orbitDepth *
-        ORBIT_DEPTH_SCALE
-      ),
+      baseScale *
+      depthMultiplier,
 
       0.05,
       1.2
@@ -2409,24 +2702,20 @@ function updateOrbit(
    DEBUG POSE
 ========================================================= */
 
-function drawPoseDebug(
-  landmarks
+function drawLine(
+  landmarkA,
+  landmarkB
 ) {
 
-  const ids = [
-    LANDMARK.LEFT_SHOULDER,
-    LANDMARK.RIGHT_SHOULDER,
-    LANDMARK.RIGHT_HIP,
-    LANDMARK.LEFT_HIP
-  ];
+  const a =
+    landmarkToCanvas(
+      landmarkA
+    );
 
 
-  const points =
-    ids.map(
-      index =>
-        landmarkToCanvas(
-          landmarks[index]
-        )
+  const b =
+    landmarkToCanvas(
+      landmarkB
     );
 
 
@@ -2438,25 +2727,15 @@ function drawPoseDebug(
 
 
   ctx.moveTo(
-    points[0].x,
-    points[0].y
+    a.x,
+    a.y
   );
 
 
-  for (
-    let i = 1;
-    i < points.length;
-    i++
-  ) {
-
-    ctx.lineTo(
-      points[i].x,
-      points[i].y
-    );
-  }
-
-
-  ctx.closePath();
+  ctx.lineTo(
+    b.x,
+    b.y
+  );
 
 
   ctx.strokeStyle =
@@ -2471,6 +2750,391 @@ function drawPoseDebug(
 }
 
 
+function drawPoint(
+  landmark
+) {
+
+  const point =
+    landmarkToCanvas(
+      landmark
+    );
+
+
+  const dpr =
+    window.devicePixelRatio || 1;
+
+
+  ctx.beginPath();
+
+
+  ctx.arc(
+    point.x,
+    point.y,
+    4 * dpr,
+    0,
+    Math.PI * 2
+  );
+
+
+  ctx.fillStyle =
+    "#00ff88";
+
+
+  ctx.fill();
+}
+
+
+function drawPoseDebug(
+  landmarks
+) {
+
+  const ls =
+    landmarks[
+      LANDMARK.LEFT_SHOULDER
+    ];
+
+
+  const rs =
+    landmarks[
+      LANDMARK.RIGHT_SHOULDER
+    ];
+
+
+  const lh =
+    landmarks[
+      LANDMARK.LEFT_HIP
+    ];
+
+
+  const rh =
+    landmarks[
+      LANDMARK.RIGHT_HIP
+    ];
+
+
+  drawLine(
+    ls,
+    rs
+  );
+
+
+  drawLine(
+    ls,
+    lh
+  );
+
+
+  drawLine(
+    rs,
+    rh
+  );
+
+
+  drawLine(
+    lh,
+    rh
+  );
+
+
+  drawPoint(
+    ls
+  );
+
+
+  drawPoint(
+    rs
+  );
+
+
+  drawPoint(
+    lh
+  );
+
+
+  drawPoint(
+    rh
+  );
+}
+
+
+/* =========================================================
+   SCREEN OVERLAY
+========================================================= */
+
+function drawOverlay() {
+
+  clearOverlay();
+
+
+  if (
+    !latestLandmarks ||
+    !trackedBody.valid
+  ) {
+
+    return;
+  }
+
+
+  drawFullHumanOcclusion();
+
+
+  /*
+    Debug stays visible on screen.
+
+    IMPORTANT:
+    Debug is NOT drawn into captureCanvas.
+  */
+
+  drawPoseDebug(
+    latestLandmarks
+  );
+}
+
+
+/* =========================================================
+   M7 CAPTURE PHOTO
+========================================================= */
+
+async function capturePhoto() {
+
+  if (
+    !cameraRunning ||
+    !renderer ||
+    video.readyState < 2
+  ) {
+
+    captureStatus.textContent =
+      "Camera not ready";
+
+
+    return;
+  }
+
+
+  captureButton.disabled =
+    true;
+
+
+  captureStatus.textContent =
+    "Capturing...";
+
+
+  try {
+
+    const transform =
+      getCoverTransform();
+
+
+    if (!transform) {
+
+      throw new Error(
+        "Capture transform unavailable"
+      );
+    }
+
+
+    captureCanvas.width =
+      overlay.width;
+
+
+    captureCanvas.height =
+      overlay.height;
+
+
+    captureCtx.clearRect(
+      0,
+      0,
+      captureCanvas.width,
+      captureCanvas.height
+    );
+
+
+    /* ---------------------------------
+       LAYER 1
+       Camera
+    --------------------------------- */
+
+    captureCtx.globalCompositeOperation =
+      "source-over";
+
+
+    drawCoverSource(
+      captureCtx,
+      video,
+      transform,
+      1,
+      true
+    );
+
+
+    /* ---------------------------------
+       LAYER 2
+       Three.js / GLB
+
+       Render a fresh frame first.
+    --------------------------------- */
+
+    renderer.render(
+      scene,
+      threeCamera
+    );
+
+
+    captureCtx.drawImage(
+      renderer.domElement,
+      0,
+      0,
+      captureCanvas.width,
+      captureCanvas.height
+    );
+
+
+    /* ---------------------------------
+       LAYER 3
+       Human occlusion
+
+       Only when GLB is on BACK half.
+    --------------------------------- */
+
+    if (
+      orbitDepth < 0 &&
+      segmentationMaskReady
+    ) {
+
+      const occlusionReady =
+        buildHumanOcclusionLayer();
+
+
+      if (occlusionReady) {
+
+        captureCtx.drawImage(
+          compositeCanvas,
+          0,
+          0,
+          captureCanvas.width,
+          captureCanvas.height
+        );
+      }
+    }
+
+
+    /* ---------------------------------
+       Export JPG
+    --------------------------------- */
+
+    const blob =
+      await new Promise(
+        (resolve) => {
+
+          captureCanvas.toBlob(
+            resolve,
+            "image/jpeg",
+            0.95
+          );
+        }
+      );
+
+
+    if (!blob) {
+
+      throw new Error(
+        "Unable to create capture image"
+      );
+    }
+
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+
+    const timestamp =
+      new Date()
+        .toISOString()
+        .replace(
+          /[:.]/g,
+          "-"
+        );
+
+
+    const link =
+      document.createElement(
+        "a"
+      );
+
+
+    link.href =
+      url;
+
+
+    link.download =
+      `human-ar-${timestamp}.jpg`;
+
+
+    document.body.appendChild(
+      link
+    );
+
+
+    link.click();
+
+
+    link.remove();
+
+
+    setTimeout(
+      () => {
+
+        URL.revokeObjectURL(
+          url
+        );
+
+      },
+      3000
+    );
+
+
+    captureStatus.textContent =
+      "PASS — Photo captured";
+
+
+    errorStatus.textContent =
+      "None";
+
+
+    setStatus(
+      "M7 photo captured"
+    );
+
+  } catch (error) {
+
+    captureStatus.textContent =
+      "FAILED";
+
+
+    setError(
+      error
+    );
+
+
+    setStatus(
+      "Capture failed"
+    );
+
+  } finally {
+
+    if (
+      cameraRunning
+    ) {
+
+      captureButton.disabled =
+        false;
+    }
+  }
+}
+
+
 /* =========================================================
    MAIN LOOP
 ========================================================= */
@@ -2478,7 +3142,8 @@ function drawPoseDebug(
 function predictPose() {
 
   if (
-    !cameraRunning
+    !cameraRunning ||
+    !poseLandmarker
   ) {
 
     return;
@@ -2494,8 +3159,7 @@ function predictPose() {
       (
         now -
         lastFrameTimestamp
-      ) /
-      1000,
+      ) / 1000,
       0.1
     );
 
@@ -2532,15 +3196,16 @@ function predictPose() {
 
 
       if (
-        result.landmarks?.length
+        result.landmarks &&
+        result.landmarks.length > 0
       ) {
-
-        latestLandmarks =
-          result.landmarks[0];
-
 
         personStatus.textContent =
           "Detected";
+
+
+        latestLandmarks =
+          result.landmarks[0];
 
 
         updateTrackedBody(
@@ -2554,12 +3219,16 @@ function predictPose() {
 
       } else {
 
-        latestLandmarks =
-          null;
+        personStatus.textContent =
+          "Not detected";
 
 
         trackedBody.valid =
           false;
+
+
+        latestLandmarks =
+          null;
 
 
         segmentationMaskReady =
@@ -2574,8 +3243,8 @@ function predictPose() {
           false;
 
 
-        personStatus.textContent =
-          "Not detected";
+        anchorStatus.textContent =
+          "Hidden";
       }
 
     } catch (error) {
@@ -2583,6 +3252,18 @@ function predictPose() {
       setError(
         error
       );
+
+
+      setStatus(
+        "Pose detection error"
+      );
+
+
+      cameraRunning =
+        false;
+
+
+      return;
     }
   }
 
@@ -2598,21 +3279,7 @@ function predictPose() {
   );
 
 
-  clearOverlay();
-
-
-  if (
-    latestLandmarks &&
-    trackedBody.valid
-  ) {
-
-    drawFullHumanOcclusion();
-
-
-    drawPoseDebug(
-      latestLandmarks
-    );
-  }
+  drawOverlay();
 
 
   animationFrameId =
@@ -2635,6 +3302,12 @@ startButton.addEventListener(
 switchButton.addEventListener(
   "click",
   switchCamera
+);
+
+
+captureButton.addEventListener(
+  "click",
+  capturePhoto
 );
 
 
@@ -2671,11 +3344,23 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 6.4A initialized"
+  "[Human AR] Milestone 7 initialized"
 );
 
 
 startButton.disabled =
+  true;
+
+
+switchButton.disabled =
+  true;
+
+
+captureButton.disabled =
+  true;
+
+
+stopButton.disabled =
   true;
 
 
@@ -2689,6 +3374,11 @@ try {
 
   setError(
     error
+  );
+
+
+  setStatus(
+    "Three.js initialization failed"
   );
 }
 

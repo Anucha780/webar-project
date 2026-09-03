@@ -131,52 +131,61 @@ let segmentationMaskReady =
 
 
 /*
-  12 FPS segmentation
+  เพิ่มจาก 12 FPS → 20 FPS
 
-  Orbit / Three.js ยัง render เต็ม FPS
+  ถ้ามือถือเครื่องไหนหนักมาก
+  ค่อยลดกลับเป็น 15
 */
 
 const SEGMENTATION_INTERVAL_MS =
-  1000 / 12;
+  1000 / 20;
 
 
 /*
-  Confidence ต่ำกว่านี้เริ่มโปร่งใส
-
-  ทำต่ำไว้เล็กน้อยเพื่อช่วยไม่ให้
-  GLB โผล่ตามขอบคนง่ายเกินไป
+  Confidence threshold
 */
 
 const MASK_CONFIDENCE_LOW =
-  0.15;
-
+  0.12;
 
 const MASK_CONFIDENCE_HIGH =
-  0.55;
+  0.52;
 
 
 /*
-  ขยาย silhouette ออกเล็กน้อย
-
-  1.00 = ขนาดจริง
-  1.04 = +4%
+  ลดจาก 1.04 → 1.02
+  ลด halo รอบตัวคน
 */
 
 const MASK_EXPANSION =
-  1.04;
+  1.02;
+
+
+/*
+  Temporal smoothing
+
+  ค่ายิ่งสูง = mask ใหม่มีผลเร็ว
+  ค่ายิ่งต่ำ = เนียน แต่ตาม movement ช้ากว่า
+
+  0.70 เหมาะกับกล้องมือถือทั่วไป
+*/
+
+const MASK_TEMPORAL_ALPHA =
+  0.70;
+
+
+/*
+  เราจะเก็บ mask ก่อนหน้าไว้
+  แล้วผสมกับ mask ใหม่
+*/
+
+let previousMaskValues =
+  null;
 
 
 /* =========================================================
    SEGMENTATION CANVASES
 ========================================================= */
-
-/*
-  maskCanvas:
-  เก็บ alpha silhouette จาก AI
-
-  compositeCanvas:
-  เก็บภาพ camera เฉพาะส่วนของคน
-*/
 
 const maskCanvas =
   document.createElement("canvas");
@@ -280,14 +289,11 @@ const FOLLOW_ORBIT_DIRECTION =
 const POSITION_SMOOTHING =
   12;
 
-
 const SCALE_SMOOTHING =
   9;
 
-
 const ROTATION_SMOOTHING =
   8;
-
 
 const MIN_VISIBILITY =
   0.55;
@@ -313,7 +319,6 @@ const LANDMARK = {
 
 let orbitAngle =
   0;
-
 
 let orbitDepth =
   0;
@@ -439,7 +444,7 @@ function dampAngle(
 
 
 /* =========================================================
-   THREE INITIALIZATION
+   THREE
 ========================================================= */
 
 function initializeThree() {
@@ -584,7 +589,7 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB LOAD + VALIDATION
+   GLB LOAD
 ========================================================= */
 
 function loadGLB() {
@@ -741,18 +746,6 @@ function loadGLB() {
           `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
 
 
-        console.log(
-          "[GLB Size]",
-          size
-        );
-
-
-        console.log(
-          "[GLB Center]",
-          center
-        );
-
-
         loadedModel =
           gltf.scene;
 
@@ -802,10 +795,6 @@ function loadGLB() {
         );
 
 
-        /* ---------------------------------
-           Animation inspection
-        --------------------------------- */
-
         const animations =
           gltf.animations || [];
 
@@ -835,11 +824,6 @@ function loadGLB() {
           clipNames
         );
 
-
-        /*
-          เลือก animation หลังจาก
-          inspect clip จริงแล้วเท่านั้น
-        */
 
         if (
           animations.length > 0
@@ -877,12 +861,6 @@ function loadGLB() {
 
 
           activeAction.play();
-
-        } else {
-
-          console.log(
-            "[GLB] No embedded animation"
-          );
         }
 
 
@@ -898,11 +876,6 @@ function loadGLB() {
           "None";
 
 
-        setStatus(
-          "GLB ready"
-        );
-
-
         updateStartButton();
 
       } catch (error) {
@@ -914,40 +887,11 @@ function loadGLB() {
         setError(
           error
         );
-
-
-        setStatus(
-          "GLB validation failed"
-        );
       }
     },
 
 
-    (progress) => {
-
-      if (
-        progress.total > 0
-      ) {
-
-        const percent =
-          Math.round(
-            (
-              progress.loaded /
-              progress.total
-            ) *
-            100
-          );
-
-
-        glbLoadStatus.textContent =
-          `${percent}%`;
-
-      } else {
-
-        glbLoadStatus.textContent =
-          "Loading...";
-      }
-    },
+    undefined,
 
 
     () => {
@@ -961,18 +905,13 @@ function loadGLB() {
           "Unable to load GLB"
         )
       );
-
-
-      setStatus(
-        "GLB load failed"
-      );
     }
   );
 }
 
 
 /* =========================================================
-   START BUTTON READY CHECK
+   READY
 ========================================================= */
 
 function updateStartButton() {
@@ -1000,7 +939,7 @@ function updateStartButton() {
 
 
 /* =========================================================
-   MEDIAPIPE POSE + SEGMENTER
+   MEDIAPIPE
 ========================================================= */
 
 async function initializeMediaPipe() {
@@ -1021,10 +960,6 @@ async function initializeMediaPipe() {
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
 
-
-    /* ---------------------------------
-       Pose
-    --------------------------------- */
 
     mediapipeStatus.textContent =
       "Loading Pose...";
@@ -1067,17 +1002,6 @@ async function initializeMediaPipe() {
       );
 
 
-    console.log(
-      "[MediaPipe] Pose ready"
-    );
-
-
-    /* ---------------------------------
-       Full Human Segmenter
-
-       Official MediaPipe Selfie Segmenter
-    --------------------------------- */
-
     mediapipeStatus.textContent =
       "Loading Segmenter...";
 
@@ -1111,11 +1035,6 @@ async function initializeMediaPipe() {
       );
 
 
-    console.log(
-      "[MediaPipe] Image Segmenter ready"
-    );
-
-
     mediapipeStatus.textContent =
       "Pose Ready | Seg Ready";
 
@@ -1137,11 +1056,6 @@ async function initializeMediaPipe() {
     );
 
 
-    setStatus(
-      "MediaPipe initialization failed"
-    );
-
-
     startButton.disabled =
       true;
   }
@@ -1154,18 +1068,10 @@ async function initializeMediaPipe() {
 
 function updateCameraDisplay() {
 
-  if (
+  video.style.transform =
     facingMode === "user"
-  ) {
-
-    video.style.transform =
-      "scaleX(-1)";
-
-  } else {
-
-    video.style.transform =
-      "none";
-  }
+      ? "scaleX(-1)"
+      : "none";
 }
 
 
@@ -1177,11 +1083,6 @@ async function startCamera() {
     !renderer ||
     !loadedModel
   ) {
-
-    setStatus(
-      "System is not ready"
-    );
-
 
     return;
   }
@@ -1300,6 +1201,10 @@ async function startCamera() {
       false;
 
 
+    previousMaskValues =
+      null;
+
+
     latestLandmarks =
       null;
 
@@ -1317,7 +1222,7 @@ async function startCamera() {
 
 
     setStatus(
-      "M6.3D Full Human Occlusion running"
+      "M6.4A Segmentation Stabilization running"
     );
 
 
@@ -1325,17 +1230,8 @@ async function startCamera() {
 
   } catch (error) {
 
-    cameraRunning =
-      false;
-
-
     setError(
       error
-    );
-
-
-    setStatus(
-      "Camera failed"
     );
 
 
@@ -1370,13 +1266,12 @@ function stopStream() {
 
   if (stream) {
 
-    for (
-      const track
-      of stream.getTracks()
-    ) {
-
-      track.stop();
-    }
+    stream
+      .getTracks()
+      .forEach(
+        track =>
+          track.stop()
+      );
   }
 
 
@@ -1416,13 +1311,12 @@ function stopStream() {
     false;
 
 
-  if (
-    modelAnchor
-  ) {
+  previousMaskValues =
+    null;
 
-    modelAnchor.visible =
-      false;
-  }
+
+  modelAnchor.visible =
+    false;
 
 
   clearOverlay();
@@ -1463,11 +1357,6 @@ function stopStream() {
 function stopCamera() {
 
   stopStream();
-
-
-  setStatus(
-    "Camera stopped"
-  );
 }
 
 
@@ -1552,25 +1441,6 @@ function resizeThree() {
     rect.height,
     false
   );
-
-
-  threeCamera.left =
-    0;
-
-
-  threeCamera.right =
-    1;
-
-
-  threeCamera.top =
-    1;
-
-
-  threeCamera.bottom =
-    0;
-
-
-  threeCamera.updateProjectionMatrix();
 }
 
 
@@ -1586,7 +1456,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT-FIT COVER
+   COVER TRANSFORM
 ========================================================= */
 
 function getCoverTransform() {
@@ -1609,9 +1479,7 @@ function getCoverTransform() {
 
   if (
     !sourceWidth ||
-    !sourceHeight ||
-    !displayWidth ||
-    !displayHeight
+    !sourceHeight
   ) {
 
     return null;
@@ -1620,12 +1488,8 @@ function getCoverTransform() {
 
   const scale =
     Math.max(
-
-      displayWidth /
-      sourceWidth,
-
-      displayHeight /
-      sourceHeight
+      displayWidth / sourceWidth,
+      displayHeight / sourceHeight
     );
 
 
@@ -1644,12 +1508,6 @@ function getCoverTransform() {
     sourceWidth,
 
     sourceHeight,
-
-    displayWidth,
-
-    displayHeight,
-
-    scale,
 
     renderedWidth,
 
@@ -1671,7 +1529,7 @@ function getCoverTransform() {
 
 
 /* =========================================================
-   LANDMARK → CANVAS
+   LANDMARK MAPPING
 ========================================================= */
 
 function landmarkToCanvas(
@@ -1682,23 +1540,9 @@ function landmarkToCanvas(
     getCoverTransform();
 
 
-  if (!transform) {
-
-    return {
-      x: 0,
-      y: 0
-    };
-  }
-
-
   let sourceX =
     landmark.x *
     transform.sourceWidth;
-
-
-  const sourceY =
-    landmark.y *
-    transform.sourceHeight;
 
 
   if (
@@ -1715,21 +1559,24 @@ function landmarkToCanvas(
 
     x:
       sourceX *
-      transform.scale -
+      (
+        transform.renderedWidth /
+        transform.sourceWidth
+      ) -
       transform.cropX,
 
 
     y:
-      sourceY *
-      transform.scale -
+      landmark.y *
+      transform.sourceHeight *
+      (
+        transform.renderedHeight /
+        transform.sourceHeight
+      ) -
       transform.cropY
   };
 }
 
-
-/* =========================================================
-   CANVAS → THREE
-========================================================= */
 
 function canvasToThree(
   point
@@ -1787,18 +1634,11 @@ function landmarkReliable(
   }
 
 
-  if (
-    landmark.visibility ===
-    undefined
-  ) {
-
-    return true;
-  }
-
-
   return (
+    landmark.visibility ===
+      undefined ||
     landmark.visibility >=
-    MIN_VISIBILITY
+      MIN_VISIBILITY
   );
 }
 
@@ -1847,96 +1687,70 @@ function updateTrackedBody(
   landmarks
 ) {
 
-  const leftShoulder =
+  const ls =
     landmarks[
       LANDMARK.LEFT_SHOULDER
     ];
 
 
-  const rightShoulder =
+  const rs =
     landmarks[
       LANDMARK.RIGHT_SHOULDER
     ];
 
 
-  const leftHip =
+  const lh =
     landmarks[
       LANDMARK.LEFT_HIP
     ];
 
 
-  const rightHip =
+  const rh =
     landmarks[
       LANDMARK.RIGHT_HIP
     ];
 
 
-  const reliable =
-    landmarkReliable(
-      leftShoulder
-    ) &&
-    landmarkReliable(
-      rightShoulder
-    ) &&
-    landmarkReliable(
-      leftHip
-    ) &&
-    landmarkReliable(
-      rightHip
-    );
-
-
-  if (!reliable) {
+  if (
+    !landmarkReliable(ls) ||
+    !landmarkReliable(rs) ||
+    !landmarkReliable(lh) ||
+    !landmarkReliable(rh)
+  ) {
 
     trackedBody.valid =
       false;
-
-
-    anchorStatus.textContent =
-      "Low confidence";
 
 
     return;
   }
 
 
-  const ls =
-    landmarkToCanvas(
-      leftShoulder
-    );
+  const pLS =
+    landmarkToCanvas(ls);
 
+  const pRS =
+    landmarkToCanvas(rs);
 
-  const rs =
-    landmarkToCanvas(
-      rightShoulder
-    );
+  const pLH =
+    landmarkToCanvas(lh);
 
-
-  const lh =
-    landmarkToCanvas(
-      leftHip
-    );
-
-
-  const rh =
-    landmarkToCanvas(
-      rightHip
-    );
+  const pRH =
+    landmarkToCanvas(rh);
 
 
   const shoulderCenter = {
 
     x:
       (
-        ls.x +
-        rs.x
+        pLS.x +
+        pRS.x
       ) / 2,
-
 
     y:
       (
-        ls.y +
-        rs.y
+        pLS.y +
+        pRS.y
       ) / 2
   };
 
@@ -1945,54 +1759,47 @@ function updateTrackedBody(
 
     x:
       (
-        lh.x +
-        rh.x
+        pLH.x +
+        pRH.x
       ) / 2,
-
 
     y:
       (
-        lh.y +
-        rh.y
+        pLH.y +
+        pRH.y
       ) / 2
   };
 
 
-  const torsoCanvas = {
+  const center =
+    canvasToThree({
 
-    x:
-      (
-        shoulderCenter.x +
-        hipCenter.x
-      ) / 2,
+      x:
+        (
+          shoulderCenter.x +
+          hipCenter.x
+        ) / 2,
 
-
-    y:
-      (
-        shoulderCenter.y +
-        hipCenter.y
-      ) / 2
-  };
-
-
-  const torsoThree =
-    canvasToThree(
-      torsoCanvas
-    );
+      y:
+        (
+          shoulderCenter.y +
+          hipCenter.y
+        ) / 2
+    });
 
 
   trackedBody.centerX =
-    torsoThree.x;
+    center.x;
 
 
   trackedBody.centerY =
-    torsoThree.y;
+    center.y;
 
 
   trackedBody.shoulderWidth =
     distance2D(
-      ls,
-      rs
+      pLS,
+      pRS
     ) /
     overlay.width;
 
@@ -2011,10 +1818,7 @@ function updateTrackedBody(
 
 
 /* =========================================================
-   SEGMENTATION
-
-   MediaPipe ImageSegmenter supports VIDEO mode and
-   confidence masks, which we use as the human alpha mask.
+   SEGMENTATION REQUEST
 ========================================================= */
 
 function requestSegmentation(
@@ -2022,9 +1826,9 @@ function requestSegmentation(
 ) {
 
   if (
-    !imageSegmenter ||
     segmentationBusy ||
     !trackedBody.valid ||
+    !imageSegmenter ||
     video.readyState < 2
   ) {
 
@@ -2067,18 +1871,12 @@ function requestSegmentation(
     setError(
       error
     );
-
-
-    console.error(
-      "[Segmentation Error]",
-      error
-    );
   }
 }
 
 
 /* =========================================================
-   SEGMENTATION RESULT
+   TEMPORALLY SMOOTHED SEGMENTATION
 ========================================================= */
 
 function handleSegmentationResult(
@@ -2088,29 +1886,16 @@ function handleSegmentationResult(
   try {
 
     if (
-      !result ||
-      !result.confidenceMasks ||
-      result.confidenceMasks.length === 0
+      !result?.confidenceMasks?.length
     ) {
 
       segmentationMaskReady =
         false;
 
 
-      segmentationBusy =
-        false;
-
-
       return;
     }
 
-
-    /*
-      Selfie Segmenter gives us foreground/person
-      confidence.
-
-      We use the first confidence mask.
-    */
 
     const mask =
       result.confidenceMasks[0];
@@ -2124,26 +1909,47 @@ function handleSegmentationResult(
       mask.height;
 
 
-    const maskData =
+    const currentValues =
       mask.getAsFloat32Array();
 
 
     if (
-      !width ||
-      !height ||
-      !maskData ||
-      maskData.length === 0
+      !previousMaskValues ||
+      previousMaskValues.length !==
+      currentValues.length
     ) {
 
-      segmentationMaskReady =
-        false;
+      previousMaskValues =
+        new Float32Array(
+          currentValues.length
+        );
 
 
-      segmentationBusy =
-        false;
+      previousMaskValues.set(
+        currentValues
+      );
 
+    } else {
 
-      return;
+      for (
+        let i = 0;
+        i < currentValues.length;
+        i++
+      ) {
+
+        previousMaskValues[i] =
+
+          previousMaskValues[i] *
+          (
+            1 -
+            MASK_TEMPORAL_ALPHA
+          )
+
+          +
+
+          currentValues[i] *
+          MASK_TEMPORAL_ALPHA;
+      }
     }
 
 
@@ -2169,70 +1975,51 @@ function handleSegmentationResult(
       );
 
 
-    let targetIndex =
+    let j =
       0;
 
 
     for (
       let i = 0;
-      i < maskData.length;
+      i < previousMaskValues.length;
       i++
     ) {
 
       const confidence =
-        maskData[i];
+        previousMaskValues[i];
 
 
       const alpha =
         smoothStep(
-
           MASK_CONFIDENCE_LOW,
-
           MASK_CONFIDENCE_HIGH,
-
           confidence
-
         ) *
         255;
 
 
-      rgba[targetIndex] =
+      rgba[j++] =
         255;
 
-
-      rgba[
-        targetIndex + 1
-      ] =
+      rgba[j++] =
         255;
 
-
-      rgba[
-        targetIndex + 2
-      ] =
+      rgba[j++] =
         255;
 
-
-      rgba[
-        targetIndex + 3
-      ] =
+      rgba[j++] =
         alpha;
-
-
-      targetIndex +=
-        4;
     }
 
 
-    const imageData =
+    maskCtx.putImageData(
+
       new ImageData(
         rgba,
         width,
         height
-      );
+      ),
 
-
-    maskCtx.putImageData(
-      imageData,
       0,
       0
     );
@@ -2242,11 +2029,6 @@ function handleSegmentationResult(
       true;
 
 
-    /*
-      Free MediaPipe mask resource
-      after copying the data.
-    */
-
     if (
       typeof mask.close ===
       "function"
@@ -2255,17 +2037,10 @@ function handleSegmentationResult(
       mask.close();
     }
 
-
   } catch (error) {
 
     segmentationMaskReady =
       false;
-
-
-    console.error(
-      "[Segmentation Result Error]",
-      error
-    );
 
 
     setError(
@@ -2281,9 +2056,7 @@ function handleSegmentationResult(
 
 
 /* =========================================================
-   DRAW COVER SOURCE
-
-   Draw video/mask using same crop + same mirror.
+   COVER DRAW
 ========================================================= */
 
 function drawCoverSource(
@@ -2350,12 +2123,9 @@ function drawCoverSource(
 
 
   targetContext.drawImage(
-
     source,
-
     drawX,
     drawY,
-
     drawWidth,
     drawHeight
   );
@@ -2367,30 +2137,12 @@ function drawCoverSource(
 
 /* =========================================================
    FULL HUMAN OCCLUSION
-
-   Camera
-       ↓
-   GLB
-       ↓
-   camera image clipped by AI human silhouette
 ========================================================= */
 
 function drawFullHumanOcclusion() {
 
   if (
-    !segmentationMaskReady
-  ) {
-
-    return;
-  }
-
-
-  /*
-    Only hide GLB when orbit is
-    on simulated BACK half.
-  */
-
-  if (
+    !segmentationMaskReady ||
     orbitDepth >= 0
   ) {
 
@@ -2403,24 +2155,7 @@ function drawFullHumanOcclusion() {
 
 
   if (!transform) {
-
     return;
-  }
-
-
-  if (
-    compositeCanvas.width !==
-    overlay.width ||
-    compositeCanvas.height !==
-    overlay.height
-  ) {
-
-    compositeCanvas.width =
-      overlay.width;
-
-
-    compositeCanvas.height =
-      overlay.height;
   }
 
 
@@ -2436,11 +2171,6 @@ function drawFullHumanOcclusion() {
     "source-over";
 
 
-  /*
-    STEP 1
-    Draw actual camera frame.
-  */
-
   drawCoverSource(
     compositeCtx,
     video,
@@ -2448,12 +2178,6 @@ function drawFullHumanOcclusion() {
     1
   );
 
-
-  /*
-    STEP 2
-
-    Keep only human silhouette.
-  */
 
   compositeCtx.globalCompositeOperation =
     "destination-in";
@@ -2470,12 +2194,6 @@ function drawFullHumanOcclusion() {
   compositeCtx.globalCompositeOperation =
     "source-over";
 
-
-  /*
-    STEP 3
-
-    Draw person cutout on canvas above Three.js.
-  */
 
   ctx.drawImage(
     compositeCanvas,
@@ -2548,11 +2266,6 @@ function updateOrbit(
     ORBIT_RADIUS_Y;
 
 
-  const centerYOffset =
-    trackedBody.torsoHeight *
-    ORBIT_CENTER_Y;
-
-
   const targetX =
     trackedBody.centerX +
     orbitX *
@@ -2561,7 +2274,8 @@ function updateOrbit(
 
   const targetY =
     trackedBody.centerY +
-    centerYOffset +
+    trackedBody.torsoHeight *
+    ORBIT_CENTER_Y +
     orbitY *
     radiusY;
 
@@ -2576,22 +2290,16 @@ function updateOrbit(
     );
 
 
-  const baseScale =
-    bodyReference *
-    MODEL_SCALE_MULTIPLIER;
-
-
-  const depthMultiplier =
-    1 +
-    orbitDepth *
-    ORBIT_DEPTH_SCALE;
-
-
   const targetScale =
     THREE.MathUtils.clamp(
 
-      baseScale *
-      depthMultiplier,
+      bodyReference *
+      MODEL_SCALE_MULTIPLIER *
+      (
+        1 +
+        orbitDepth *
+        ORBIT_DEPTH_SCALE
+      ),
 
       0.05,
       1.2
@@ -2688,7 +2396,7 @@ function updateOrbit(
 
   const maskLabel =
     segmentationMaskReady
-      ? "MASK OK"
+      ? "MASK STABLE"
       : "MASK WAIT";
 
 
@@ -2701,20 +2409,24 @@ function updateOrbit(
    DEBUG POSE
 ========================================================= */
 
-function drawLine(
-  landmarkA,
-  landmarkB
+function drawPoseDebug(
+  landmarks
 ) {
 
-  const a =
-    landmarkToCanvas(
-      landmarkA
-    );
+  const ids = [
+    LANDMARK.LEFT_SHOULDER,
+    LANDMARK.RIGHT_SHOULDER,
+    LANDMARK.RIGHT_HIP,
+    LANDMARK.LEFT_HIP
+  ];
 
 
-  const b =
-    landmarkToCanvas(
-      landmarkB
+  const points =
+    ids.map(
+      index =>
+        landmarkToCanvas(
+          landmarks[index]
+        )
     );
 
 
@@ -2726,15 +2438,25 @@ function drawLine(
 
 
   ctx.moveTo(
-    a.x,
-    a.y
+    points[0].x,
+    points[0].y
   );
 
 
-  ctx.lineTo(
-    b.x,
-    b.y
-  );
+  for (
+    let i = 1;
+    i < points.length;
+    i++
+  ) {
+
+    ctx.lineTo(
+      points[i].x,
+      points[i].y
+    );
+  }
+
+
+  ctx.closePath();
 
 
   ctx.strokeStyle =
@@ -2742,157 +2464,10 @@ function drawLine(
 
 
   ctx.lineWidth =
-    2 *
-    dpr;
+    2 * dpr;
 
 
   ctx.stroke();
-}
-
-
-function drawPoint(
-  landmark
-) {
-
-  const point =
-    landmarkToCanvas(
-      landmark
-    );
-
-
-  const dpr =
-    window.devicePixelRatio || 1;
-
-
-  ctx.beginPath();
-
-
-  ctx.arc(
-    point.x,
-    point.y,
-    4 * dpr,
-    0,
-    Math.PI * 2
-  );
-
-
-  ctx.fillStyle =
-    "#00ff88";
-
-
-  ctx.fill();
-}
-
-
-function drawPoseDebug(
-  landmarks
-) {
-
-  const ls =
-    landmarks[
-      LANDMARK.LEFT_SHOULDER
-    ];
-
-
-  const rs =
-    landmarks[
-      LANDMARK.RIGHT_SHOULDER
-    ];
-
-
-  const lh =
-    landmarks[
-      LANDMARK.LEFT_HIP
-    ];
-
-
-  const rh =
-    landmarks[
-      LANDMARK.RIGHT_HIP
-    ];
-
-
-  drawLine(
-    ls,
-    rs
-  );
-
-
-  drawLine(
-    ls,
-    lh
-  );
-
-
-  drawLine(
-    rs,
-    rh
-  );
-
-
-  drawLine(
-    lh,
-    rh
-  );
-
-
-  drawPoint(
-    ls
-  );
-
-
-  drawPoint(
-    rs
-  );
-
-
-  drawPoint(
-    lh
-  );
-
-
-  drawPoint(
-    rh
-  );
-}
-
-
-/* =========================================================
-   OVERLAY
-========================================================= */
-
-function drawOverlay() {
-
-  clearOverlay();
-
-
-  if (
-    !latestLandmarks ||
-    !trackedBody.valid
-  ) {
-
-    return;
-  }
-
-
-  /*
-    Layer order:
-
-    video
-      ↓
-    Three.js
-      ↓
-    Full human silhouette
-      ↓
-    Debug landmarks
-  */
-
-  drawFullHumanOcclusion();
-
-
-  drawPoseDebug(
-    latestLandmarks
-  );
 }
 
 
@@ -2903,8 +2478,7 @@ function drawOverlay() {
 function predictPose() {
 
   if (
-    !cameraRunning ||
-    !poseLandmarker
+    !cameraRunning
   ) {
 
     return;
@@ -2920,7 +2494,8 @@ function predictPose() {
       (
         now -
         lastFrameTimestamp
-      ) / 1000,
+      ) /
+      1000,
       0.1
     );
 
@@ -2929,10 +2504,6 @@ function predictPose() {
     now;
 
 
-  /* ---------------------------------
-     GLB embedded animation
-  --------------------------------- */
-
   if (mixer) {
 
     mixer.update(
@@ -2940,10 +2511,6 @@ function predictPose() {
     );
   }
 
-
-  /* ---------------------------------
-     Pose
-  --------------------------------- */
 
   if (
     video.readyState >= 2 &&
@@ -2965,16 +2532,15 @@ function predictPose() {
 
 
       if (
-        result.landmarks &&
-        result.landmarks.length > 0
+        result.landmarks?.length
       ) {
-
-        personStatus.textContent =
-          "Detected";
-
 
         latestLandmarks =
           result.landmarks[0];
+
+
+        personStatus.textContent =
+          "Detected";
 
 
         updateTrackedBody(
@@ -2982,39 +2548,34 @@ function predictPose() {
         );
 
 
-        /*
-          Only ask segmentation when
-          pose says a person is present.
-        */
-
         requestSegmentation(
           now
         );
 
       } else {
 
-        personStatus.textContent =
-          "Not detected";
+        latestLandmarks =
+          null;
 
 
         trackedBody.valid =
           false;
 
 
-        latestLandmarks =
-          null;
-
-
         segmentationMaskReady =
           false;
+
+
+        previousMaskValues =
+          null;
 
 
         modelAnchor.visible =
           false;
 
 
-        anchorStatus.textContent =
-          "Hidden";
+        personStatus.textContent =
+          "Not detected";
       }
 
     } catch (error) {
@@ -3022,34 +2583,14 @@ function predictPose() {
       setError(
         error
       );
-
-
-      setStatus(
-        "Pose detection error"
-      );
-
-
-      cameraRunning =
-        false;
-
-
-      return;
     }
   }
 
-
-  /* ---------------------------------
-     Orbit
-  --------------------------------- */
 
   updateOrbit(
     delta
   );
 
-
-  /* ---------------------------------
-     Three.js
-  --------------------------------- */
 
   renderer.render(
     scene,
@@ -3057,11 +2598,21 @@ function predictPose() {
   );
 
 
-  /* ---------------------------------
-     Human Occlusion
-  --------------------------------- */
+  clearOverlay();
 
-  drawOverlay();
+
+  if (
+    latestLandmarks &&
+    trackedBody.valid
+  ) {
+
+    drawFullHumanOcclusion();
+
+
+    drawPoseDebug(
+      latestLandmarks
+    );
+  }
 
 
   animationFrameId =
@@ -3120,7 +2671,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 6.3D initialized"
+  "[Human AR] Milestone 6.4A initialized"
 );
 
 
@@ -3138,11 +2689,6 @@ try {
 
   setError(
     error
-  );
-
-
-  setStatus(
-    "Three.js initialization failed"
   );
 }
 

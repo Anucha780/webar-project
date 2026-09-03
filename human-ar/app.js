@@ -136,50 +136,62 @@ let activeAction =
 
 
 /* =========================================================
-   MODEL CONFIG
+   MODEL
 ========================================================= */
 
 const MODEL_PATH =
   "./models/test-model.glb";
 
-const ANIMATION_NAME =
-  "Take 001";
-
 
 /*
-  MODEL_SCALE_MULTIPLIER
+  ขนาด character เทียบกับคน
 
-  เพิ่มค่า = ตัวใหญ่ขึ้น
-  ลดค่า = ตัวเล็กลง
+  ใหญ่เกิน -> ลด
+  เล็กเกิน -> เพิ่ม
 */
 
 const MODEL_SCALE_MULTIPLIER =
-  2.0;
+  1.8;
 
 
 /*
-  Screen-space offset.
+  Character จะอยู่ด้านไหนของคน
 
-  X:
-    negative = ซ้าย
-    positive = ขวา
-
-  Y:
-    negative = ลง
-    positive = ขึ้น
+  "right" = ด้านขวาของหน้าจอ
+  "left"  = ด้านซ้ายของหน้าจอ
 */
 
-const MODEL_OFFSET_X =
-  0.0;
-
-const MODEL_OFFSET_Y =
-  0.0;
+const CHARACTER_SIDE =
+  "right";
 
 
 /*
-  Local rotation ของ GLB
+  ระยะห่างจากคน
 
-  ใช้จูนทีหลังหากโมเดลหันผิดด้าน
+  ค่านี้อิงกับ shoulder width
+  ไม่ใช่ pixel ตายตัว
+*/
+
+const SIDE_DISTANCE =
+  1.25;
+
+
+/*
+  Y Offset
+
+  positive = ขึ้น
+  negative = ลง
+*/
+
+const MODEL_OFFSET_Y =
+  -0.03;
+
+
+/*
+  Rotation ของ GLB เอง
+
+  ถ้าตัวละครหันผิดด้าน
+  ค่อยจูนค่าตรงนี้ภายหลัง
 */
 
 const MODEL_ROTATION_X =
@@ -192,58 +204,25 @@ const MODEL_ROTATION_Z =
   0;
 
 
-/*
-  ให้โมเดลเอียงตามแนวหัวไหล่หรือไม่
-*/
-
-const FOLLOW_SHOULDER_TILT =
-  true;
-
-
-/*
-  จำกัดไม่ให้เอียงแรงเกินไป
-
-  20 degrees
-*/
-
-const MAX_BODY_TILT =
-  THREE.MathUtils.degToRad(
-    20
-  );
-
-
 /* =========================================================
-   SMOOTHING CONFIG
-
-   ค่ายิ่งสูง = ตามเร็วขึ้น
-   ค่ายิ่งต่ำ = เนียนขึ้น แต่หน่วงขึ้น
+   SMOOTHING
 ========================================================= */
 
 const POSITION_SMOOTHING =
-  12;
+  10;
 
 const SCALE_SMOOTHING =
-  9;
-
-const ROTATION_SMOOTHING =
   8;
-
-
-/*
-  Landmark visibility ต่ำกว่านี้
-  จะไม่เอามาคำนวณ anchor
-*/
 
 const MIN_VISIBILITY =
   0.55;
 
 
 /* =========================================================
-   MEDIAPIPE LANDMARKS
+   LANDMARK INDEX
 ========================================================= */
 
 const LANDMARK = {
-  NOSE: 0,
 
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
@@ -281,7 +260,7 @@ function setError(error) {
 
 
 /* =========================================================
-   FRAME-RATE INDEPENDENT DAMPING
+   SMOOTHING
 ========================================================= */
 
 function damp(
@@ -306,7 +285,7 @@ function damp(
 
 
 /* =========================================================
-   THREE INITIALIZATION
+   THREE
 ========================================================= */
 
 function initializeThree() {
@@ -322,9 +301,10 @@ function initializeThree() {
 
 
     /*
-      Screen-space orthographic camera.
+      Screen-space coordinate system
 
-      ยังไม่ใช่ world tracking.
+      x = 0 → 1
+      y = 0 → 1
     */
 
     threeCamera =
@@ -387,12 +367,6 @@ function initializeThree() {
     );
 
 
-    /*
-      เริ่มด้วย scale เล็ก ๆ
-      เพื่อไม่ให้เกิดการกระโดดจาก 1 → target
-      ใน frame แรก
-    */
-
     modelAnchor.scale.setScalar(
       0.1
     );
@@ -447,10 +421,6 @@ function initializeThree() {
       `Ready r${THREE.REVISION}`;
 
 
-    console.log(
-      `[Human AR] Three.js revision ${THREE.REVISION}`
-    );
-
   } catch (error) {
 
     threeStatus.textContent =
@@ -468,7 +438,7 @@ function initializeThree() {
 
 
 /* =========================================================
-   GLB
+   GLB LOAD + VALIDATE
 ========================================================= */
 
 function loadGLB() {
@@ -577,6 +547,10 @@ function loadGLB() {
         }
 
 
+        /* ---------------------------------
+           Bounding box
+        --------------------------------- */
+
         const box =
           new THREE.Box3()
             .setFromObject(
@@ -624,13 +598,25 @@ function loadGLB() {
           `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
 
 
+        console.log(
+          "[GLB Size]",
+          size
+        );
+
+
+        console.log(
+          "[GLB Center]",
+          center
+        );
+
+
+        /* ---------------------------------
+           Normalize
+        --------------------------------- */
+
         loadedModel =
           gltf.scene;
 
-
-        /*
-          Center model around its local origin.
-        */
 
         loadedModel.position.set(
           -center.x,
@@ -660,21 +646,10 @@ function loadGLB() {
         }
 
 
-        /*
-          Normalize GLB.
-
-          หลังจากนั้น modelAnchor.scale
-          จะเป็นผู้ควบคุมขนาดตามคน
-        */
-
         loadedModel.scale.setScalar(
           1 / maxDimension
         );
 
-
-        /*
-          Local orientation configuration.
-        */
 
         loadedModel.rotation.set(
           MODEL_ROTATION_X,
@@ -688,9 +663,9 @@ function loadGLB() {
         );
 
 
-        /* ----------------------------------
-           Animation
-        ---------------------------------- */
+        /* ---------------------------------
+           Inspect animations FIRST
+        --------------------------------- */
 
         const animations =
           gltf.animations || [];
@@ -722,27 +697,28 @@ function loadGLB() {
         );
 
 
-        const selectedClip =
-          THREE.AnimationClip.findByName(
-            animations,
-            ANIMATION_NAME
-          );
+        /*
+          Important:
 
+          เราไม่ guess ชื่อ animation
 
-        if (
-          animations.length > 0 &&
-          !selectedClip
-        ) {
-
-          throw new Error(
-            `Animation "${ANIMATION_NAME}" not found`
-          );
-        }
-
+          หลังจาก inspect gltf.animations แล้ว
+          ถ้ามี clip จริง จึงใช้ clip ตัวแรก
+        */
 
         if (
-          selectedClip
+          animations.length > 0
         ) {
+
+          const selectedClip =
+            animations[0];
+
+
+          console.log(
+            "[GLB Selected Animation]",
+            selectedClip.name
+          );
+
 
           mixer =
             new THREE.AnimationMixer(
@@ -767,9 +743,10 @@ function loadGLB() {
 
           activeAction.play();
 
+        } else {
 
           console.log(
-            `[GLB] Playing animation: ${selectedClip.name}`
+            "[GLB] No animations"
           );
         }
 
@@ -782,8 +759,12 @@ function loadGLB() {
           "PASS";
 
 
+        errorStatus.textContent =
+          "None";
+
+
         setStatus(
-          `GLB ready — ${ANIMATION_NAME}`
+          "GLB ready — Character Side Mode"
         );
 
 
@@ -837,13 +818,7 @@ function loadGLB() {
     },
 
 
-    (error) => {
-
-      console.error(
-        "[GLB Load Error]",
-        error
-      );
-
+    () => {
 
       glbLoadStatus.textContent =
         "FAILED";
@@ -853,11 +828,6 @@ function loadGLB() {
         new Error(
           "Unable to load GLB"
         )
-      );
-
-
-      setStatus(
-        "GLB load failed"
       );
     }
   );
@@ -905,17 +875,22 @@ async function initializePose() {
               "GPU"
           },
 
+
           runningMode:
             "VIDEO",
+
 
           numPoses:
             1,
 
+
           minPoseDetectionConfidence:
             0.5,
 
+
           minPosePresenceConfidence:
             0.5,
+
 
           minTrackingConfidence:
             0.5
@@ -928,7 +903,7 @@ async function initializePose() {
 
 
     setStatus(
-      "Pose + GLB ready — start camera"
+      "Ready — Start Camera"
     );
 
 
@@ -949,10 +924,6 @@ async function initializePose() {
     setStatus(
       "MediaPipe failed"
     );
-
-
-    startButton.disabled =
-      true;
   }
 }
 
@@ -990,6 +961,7 @@ async function startCamera() {
       "System is not ready"
     );
 
+
     return;
   }
 
@@ -1017,6 +989,7 @@ async function startCamera() {
           audio:
             false,
 
+
           video: {
 
             facingMode: {
@@ -1024,10 +997,12 @@ async function startCamera() {
                 facingMode
             },
 
+
             width: {
               ideal:
                 1280
             },
+
 
             height: {
               ideal:
@@ -1076,10 +1051,6 @@ async function startCamera() {
     resizeThree();
 
 
-    startButton.disabled =
-      true;
-
-
     switchButton.disabled =
       false;
 
@@ -1097,7 +1068,7 @@ async function startCamera() {
 
 
     setStatus(
-      "M6.2 tracking running"
+      "M6.3A Character Side Mode running"
     );
 
 
@@ -1126,7 +1097,7 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP / SWITCH
+   STOP
 ========================================================= */
 
 function stopStream() {
@@ -1426,7 +1397,7 @@ function getCoverTransform() {
 
 
 /* =========================================================
-   COORDINATE MAPPING
+   LANDMARK → CANVAS
 ========================================================= */
 
 function landmarkToCanvas(
@@ -1473,6 +1444,7 @@ function landmarkToCanvas(
       transform.scale -
       transform.cropX,
 
+
     y:
       sourceY *
       transform.scale -
@@ -1480,6 +1452,10 @@ function landmarkToCanvas(
   };
 }
 
+
+/* =========================================================
+   CANVAS → THREE
+========================================================= */
 
 function canvasToThree(
   point
@@ -1490,6 +1466,7 @@ function canvasToThree(
     x:
       point.x /
       overlay.width,
+
 
     y:
       1 -
@@ -1502,7 +1479,7 @@ function canvasToThree(
 
 
 /* =========================================================
-   UTILS
+   UTILITY
 ========================================================= */
 
 function distance2D(
@@ -1527,7 +1504,7 @@ function distance2D(
 }
 
 
-function landmarkIsReliable(
+function landmarkReliable(
   landmark
 ) {
 
@@ -1553,10 +1530,10 @@ function landmarkIsReliable(
 
 
 /* =========================================================
-   BODY TRACKING
+   CHARACTER BESIDE PERSON
 ========================================================= */
 
-function updateModelAnchor(
+function updateCharacter(
   landmarks,
   delta
 ) {
@@ -1585,27 +1562,26 @@ function updateModelAnchor(
     ];
 
 
-  /*
-    ไม่ใช้ tracking frame ที่ landmarks
-    หลักไม่น่าเชื่อถือ
-  */
-
   const reliable =
-    landmarkIsReliable(
+    landmarkReliable(
       leftShoulder
     ) &&
-    landmarkIsReliable(
+    landmarkReliable(
       rightShoulder
     ) &&
-    landmarkIsReliable(
+    landmarkReliable(
       leftHip
     ) &&
-    landmarkIsReliable(
+    landmarkReliable(
       rightHip
     );
 
 
   if (!reliable) {
+
+    modelAnchor.visible =
+      false;
+
 
     anchorStatus.textContent =
       "Low confidence";
@@ -1615,50 +1591,51 @@ function updateModelAnchor(
   }
 
 
-  /* ----------------------------------
-     Display-space landmark points
-  ---------------------------------- */
+  /* ---------------------------------
+     Convert landmarks to display
+  --------------------------------- */
 
-  const leftShoulderCanvas =
+  const ls =
     landmarkToCanvas(
       leftShoulder
     );
 
 
-  const rightShoulderCanvas =
+  const rs =
     landmarkToCanvas(
       rightShoulder
     );
 
 
-  const leftHipCanvas =
+  const lh =
     landmarkToCanvas(
       leftHip
     );
 
 
-  const rightHipCanvas =
+  const rh =
     landmarkToCanvas(
       rightHip
     );
 
 
-  /* ----------------------------------
-     Centers
-  ---------------------------------- */
+  /* ---------------------------------
+     Body centers
+  --------------------------------- */
 
   const shoulderCenter = {
 
     x:
       (
-        leftShoulderCanvas.x +
-        rightShoulderCanvas.x
+        ls.x +
+        rs.x
       ) / 2,
+
 
     y:
       (
-        leftShoulderCanvas.y +
-        rightShoulderCanvas.y
+        ls.y +
+        rs.y
       ) / 2
   };
 
@@ -1667,32 +1644,27 @@ function updateModelAnchor(
 
     x:
       (
-        leftHipCanvas.x +
-        rightHipCanvas.x
+        lh.x +
+        rh.x
       ) / 2,
+
 
     y:
       (
-        leftHipCanvas.y +
-        rightHipCanvas.y
+        lh.y +
+        rh.y
       ) / 2
   };
 
 
-  /*
-    Torso center from DISPLAY coordinates,
-    not normalized MediaPipe coordinates.
-
-    This keeps crop/mirror correction exact.
-  */
-
-  const torsoCanvas = {
+  const torsoCenter = {
 
     x:
       (
         shoulderCenter.x +
         hipCenter.x
       ) / 2,
+
 
     y:
       (
@@ -1702,50 +1674,82 @@ function updateModelAnchor(
   };
 
 
-  const torsoThree =
-    canvasToThree(
-      torsoCanvas
+  /* ---------------------------------
+     Body dimensions
+  --------------------------------- */
+
+  const shoulderWidthPixels =
+    distance2D(
+      ls,
+      rs
     );
 
 
-  /* ----------------------------------
-     Screen offset
-  ---------------------------------- */
+  const torsoHeightPixels =
+    distance2D(
+      shoulderCenter,
+      hipCenter
+    );
 
-  const targetX =
-    torsoThree.x +
-    MODEL_OFFSET_X;
-
-
-  const targetY =
-    torsoThree.y +
-    MODEL_OFFSET_Y;
-
-
-  /* ----------------------------------
-     Scale
-
-     Combine shoulder width + torso height
-     เพื่อให้เสถียรกว่าดู shoulder อย่างเดียว
-  ---------------------------------- */
 
   const shoulderWidth =
-    distance2D(
-      leftShoulderCanvas,
-      rightShoulderCanvas
-    ) /
+    shoulderWidthPixels /
     overlay.width;
 
 
   const torsoHeight =
-    distance2D(
-      shoulderCenter,
-      hipCenter
-    ) /
+    torsoHeightPixels /
     overlay.height;
 
 
-  const bodyScaleReference =
+  /* ---------------------------------
+     Character side position
+  --------------------------------- */
+
+  const sideSign =
+    CHARACTER_SIDE === "left"
+      ? -1
+      : 1;
+
+
+  /*
+    Character position in canvas pixels.
+
+    การใช้ shoulderWidth ทำให้ระยะห่างจากคน
+    ขยาย/ย่อตามขนาดคนด้วย
+  */
+
+  const characterCanvas = {
+
+    x:
+      torsoCenter.x +
+      (
+        sideSign *
+        shoulderWidthPixels *
+        SIDE_DISTANCE
+      ),
+
+
+    y:
+      torsoCenter.y -
+      (
+        MODEL_OFFSET_Y *
+        overlay.height
+      )
+  };
+
+
+  const characterThree =
+    canvasToThree(
+      characterCanvas
+    );
+
+
+  /* ---------------------------------
+     Scale
+  --------------------------------- */
+
+  const bodyReference =
     (
       shoulderWidth * 0.65 +
       torsoHeight * 0.35
@@ -1755,65 +1759,22 @@ function updateModelAnchor(
   const targetScale =
     THREE.MathUtils.clamp(
 
-      bodyScaleReference *
+      bodyReference *
       MODEL_SCALE_MULTIPLIER,
 
-      0.07,
-      1.3
+      0.06,
+      1.2
     );
 
 
-  /* ----------------------------------
-     Shoulder tilt
-  ---------------------------------- */
-
-  let targetRotationZ =
-    0;
-
-
-  if (
-    FOLLOW_SHOULDER_TILT
-  ) {
-
-    const dx =
-      rightShoulderCanvas.x -
-      leftShoulderCanvas.x;
-
-
-    const dy =
-      rightShoulderCanvas.y -
-      leftShoulderCanvas.y;
-
-
-    /*
-      Canvas y grows downward,
-      so negate atan result for Three.js.
-    */
-
-    targetRotationZ =
-      -Math.atan2(
-        dy,
-        dx
-      );
-
-
-    targetRotationZ =
-      THREE.MathUtils.clamp(
-        targetRotationZ,
-        -MAX_BODY_TILT,
-        MAX_BODY_TILT
-      );
-  }
-
-
-  /* ----------------------------------
-     Position damping
-  ---------------------------------- */
+  /* ---------------------------------
+     Smooth movement
+  --------------------------------- */
 
   modelAnchor.position.x =
     damp(
       modelAnchor.position.x,
-      targetX,
+      characterThree.x,
       POSITION_SMOOTHING,
       delta
     );
@@ -1822,15 +1783,11 @@ function updateModelAnchor(
   modelAnchor.position.y =
     damp(
       modelAnchor.position.y,
-      targetY,
+      characterThree.y,
       POSITION_SMOOTHING,
       delta
     );
 
-
-  /* ----------------------------------
-     Scale damping
-  ---------------------------------- */
 
   const smoothScale =
     damp(
@@ -1846,17 +1803,13 @@ function updateModelAnchor(
   );
 
 
-  /* ----------------------------------
-     Rotation damping
-  ---------------------------------- */
+  /*
+    Character ยืนตรงเอง
+    ไม่เอียงตามไหล่ใน mode นี้
+  */
 
   modelAnchor.rotation.z =
-    damp(
-      modelAnchor.rotation.z,
-      targetRotationZ,
-      ROTATION_SMOOTHING,
-      delta
-    );
+    0;
 
 
   modelAnchor.visible =
@@ -1864,86 +1817,28 @@ function updateModelAnchor(
 
 
   anchorStatus.textContent =
-    `x ${modelAnchor.position.x.toFixed(3)} | y ${modelAnchor.position.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
+    `${CHARACTER_SIDE.toUpperCase()} SIDE | x ${modelAnchor.position.x.toFixed(3)} | y ${modelAnchor.position.y.toFixed(3)} | scale ${smoothScale.toFixed(3)}`;
 }
 
 
 /* =========================================================
-   DEBUG POSE
+   DEBUG BODY
 ========================================================= */
 
-function drawPoint(
-  landmark,
-  label
-) {
-
-  const point =
-    landmarkToCanvas(
-      landmark
-    );
-
-
-  const dpr =
-    window.devicePixelRatio || 1;
-
-
-  const radius =
-    5 *
-    dpr;
-
-
-  ctx.beginPath();
-
-
-  ctx.arc(
-    point.x,
-    point.y,
-    radius,
-    0,
-    Math.PI * 2
-  );
-
-
-  ctx.fillStyle =
-    "#00ff88";
-
-
-  ctx.fill();
-
-
-  ctx.font =
-    `${10 * dpr}px Arial`;
-
-
-  ctx.fillStyle =
-    "#ffffff";
-
-
-  ctx.fillText(
-    label,
-    point.x +
-    radius +
-    3 * dpr,
-    point.y -
-    3 * dpr
-  );
-}
-
-
 function drawLine(
-  aLandmark,
-  bLandmark
+  landmarkA,
+  landmarkB
 ) {
 
   const a =
     landmarkToCanvas(
-      aLandmark
+      landmarkA
     );
 
 
   const b =
     landmarkToCanvas(
-      bLandmark
+      landmarkB
     );
 
 
@@ -1971,11 +1866,44 @@ function drawLine(
 
 
   ctx.lineWidth =
-    2 *
-    dpr;
+    2 * dpr;
 
 
   ctx.stroke();
+}
+
+
+function drawPoint(
+  landmark
+) {
+
+  const point =
+    landmarkToCanvas(
+      landmark
+    );
+
+
+  const dpr =
+    window.devicePixelRatio || 1;
+
+
+  ctx.beginPath();
+
+
+  ctx.arc(
+    point.x,
+    point.y,
+    4 * dpr,
+    0,
+    Math.PI * 2
+  );
+
+
+  ctx.fillStyle =
+    "#00ff88";
+
+
+  ctx.fill();
 }
 
 
@@ -1986,93 +1914,77 @@ function drawPose(
   clearOverlay();
 
 
-  const nose =
-    landmarks[
-      LANDMARK.NOSE
-    ];
-
-
-  const leftShoulder =
+  const ls =
     landmarks[
       LANDMARK.LEFT_SHOULDER
     ];
 
 
-  const rightShoulder =
+  const rs =
     landmarks[
       LANDMARK.RIGHT_SHOULDER
     ];
 
 
-  const leftHip =
+  const lh =
     landmarks[
       LANDMARK.LEFT_HIP
     ];
 
 
-  const rightHip =
+  const rh =
     landmarks[
       LANDMARK.RIGHT_HIP
     ];
 
 
   drawLine(
-    leftShoulder,
-    rightShoulder
+    ls,
+    rs
   );
 
 
   drawLine(
-    leftShoulder,
-    leftHip
+    ls,
+    lh
   );
 
 
   drawLine(
-    rightShoulder,
-    rightHip
+    rs,
+    rh
   );
 
 
   drawLine(
-    leftHip,
-    rightHip
+    lh,
+    rh
   );
 
 
   drawPoint(
-    nose,
-    "HEAD"
+    ls
   );
 
 
   drawPoint(
-    leftShoulder,
-    "L SHOULDER"
+    rs
   );
 
 
   drawPoint(
-    rightShoulder,
-    "R SHOULDER"
+    lh
   );
 
 
   drawPoint(
-    leftHip,
-    "L HIP"
-  );
-
-
-  drawPoint(
-    rightHip,
-    "R HIP"
+    rh
   );
 }
 
 
 /* =========================================================
-   POSE LOOP
+   LOOP
 ========================================================= */
 
 function predictPose() {
@@ -2116,8 +2028,7 @@ function predictPose() {
 
   if (
     video.readyState >= 2 &&
-    video.currentTime !==
-    lastVideoTime
+    video.currentTime !== lastVideoTime
   ) {
 
     lastVideoTime =
@@ -2151,7 +2062,7 @@ function predictPose() {
         );
 
 
-        updateModelAnchor(
+        updateCharacter(
           landmarks,
           delta
         );
@@ -2165,13 +2076,8 @@ function predictPose() {
         clearOverlay();
 
 
-        if (
-          modelAnchor
-        ) {
-
-          modelAnchor.visible =
-            false;
-        }
+        modelAnchor.visible =
+          false;
 
 
         anchorStatus.textContent =
@@ -2257,11 +2163,11 @@ window.addEventListener(
 
 
 /* =========================================================
-   INITIALIZATION
+   INIT
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 6.2 initialized"
+  "[Human AR] Milestone 6.3A initialized"
 );
 
 

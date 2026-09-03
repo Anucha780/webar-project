@@ -29,7 +29,8 @@ function setError(error) {
 
 function checkEnvironment() {
   protocolStatus.textContent = window.location.protocol;
-  secureStatus.textContent = window.isSecureContext ? "YES" : "NO";
+  secureStatus.textContent =
+    window.isSecureContext ? "YES" : "NO";
 
   const supported = !!(
     navigator.mediaDevices &&
@@ -50,14 +51,6 @@ function checkEnvironment() {
   }
 
   setStatus("Environment ready");
-}
-
-function updateVideoOrientation() {
-  if (facingMode === "user") {
-    video.classList.add("mirror");
-  } else {
-    video.classList.remove("mirror");
-  }
 }
 
 function stopStream() {
@@ -98,13 +91,16 @@ async function startCamera() {
 
     const constraints = {
       audio: false,
+
       video: {
         facingMode: {
           ideal: facingMode
         },
+
         width: {
           ideal: 1280
         },
+
         height: {
           ideal: 720
         }
@@ -119,8 +115,6 @@ async function startCamera() {
     video.srcObject = stream;
 
     await video.play();
-
-    updateVideoOrientation();
 
     video.style.display = "block";
     placeholder.style.display = "none";

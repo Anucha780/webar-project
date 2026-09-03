@@ -64,10 +64,6 @@ a {
   background: #000000;
 }
 
-#camera.mirror {
-  transform: scaleX(-1);
-}
-
 .camera-placeholder {
   position: absolute;
   inset: 0;

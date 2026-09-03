@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <title>Human AR — Three.js Test</title>
+  <title>Human AR — GLB Validation</title>
 
   <link rel="stylesheet" href="./style.css">
 </head>
@@ -19,7 +19,7 @@
 
     <header class="top-bar">
       <a class="back-link" href="../">← Back</a>
-      <span class="milestone">Human AR — M4</span>
+      <span class="milestone">Human AR — M5</span>
     </header>
 
     <section class="camera-container">
@@ -31,10 +31,8 @@
         muted
       ></video>
 
-      <!-- Three.js renders here -->
       <div id="three-layer"></div>
 
-      <!-- MediaPipe debug overlay -->
       <canvas id="pose-overlay"></canvas>
 
       <div
@@ -72,33 +70,8 @@
       </div>
 
       <div class="debug-row">
-        <strong>Camera</strong>
-        <span id="camera-status">Stopped</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Facing Mode</strong>
-        <span id="facing-status">user</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Resolution</strong>
-        <span id="resolution-status">—</span>
-      </div>
-
-      <div class="debug-row">
         <strong>MediaPipe</strong>
         <span id="mediapipe-status">Loading...</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Person</strong>
-        <span id="person-status">Not detected</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Pose FPS</strong>
-        <span id="fps-status">—</span>
       </div>
 
       <div class="debug-row">
@@ -107,18 +80,58 @@
       </div>
 
       <div class="debug-row">
+        <strong>GLB Path</strong>
+        <span id="glb-path-status">models/test-model.glb</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>GLB Load</strong>
+        <span id="glb-load-status">Waiting...</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Meshes</strong>
+        <span id="mesh-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Materials</strong>
+        <span id="material-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Bounding Box</strong>
+        <span id="bbox-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Model Size</strong>
+        <span id="size-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Animations</strong>
+        <span id="animation-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Animation Clips</strong>
+        <span id="clip-status">—</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Camera</strong>
+        <span id="camera-status">Stopped</span>
+      </div>
+
+      <div class="debug-row">
+        <strong>Person</strong>
+        <span id="person-status">Not detected</span>
+      </div>
+
+      <div class="debug-row">
         <strong>3D Anchor</strong>
         <span id="anchor-status">Hidden</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Left Shoulder</strong>
-        <span id="left-shoulder-status">—</span>
-      </div>
-
-      <div class="debug-row">
-        <strong>Right Shoulder</strong>
-        <span id="right-shoulder-status">—</span>
       </div>
 
       <div class="debug-row">

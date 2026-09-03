@@ -47,78 +47,45 @@ a {
   font-size: 14px;
 }
 
-/* =========================================================
-   CAMERA STACK
-========================================================= */
-
 .camera-container {
   position: relative;
-
   width: 100%;
   aspect-ratio: 3 / 4;
-
   overflow: hidden;
-
   background: #050506;
-
   border: 1px solid #30343c;
   border-radius: 14px;
 }
 
-/*
-  Layer 1 — camera
-*/
-
 #camera {
   display: none;
-
   width: 100%;
   height: 100%;
-
   object-fit: cover;
-
   background: #000000;
 }
 
-/*
-  Layer 2 — Three.js
-
-  This layer does NOT control the camera.
-  It is transparent.
-*/
-
 #three-layer {
   display: none;
-
   position: absolute;
   inset: 0;
-
   width: 100%;
   height: 100%;
-
   pointer-events: none;
 }
 
 #three-layer canvas {
   display: block;
-
   width: 100%;
   height: 100%;
 }
 
-/*
-  Layer 3 — MediaPipe debug drawing
-*/
-
 #pose-overlay {
   display: none;
-
   position: absolute;
   inset: 0;
-
   width: 100%;
   height: 100%;
-
   pointer-events: none;
 }
 
@@ -133,34 +100,23 @@ a {
   padding: 24px;
 
   color: #8f96a3;
-
   text-align: center;
 }
-
-/* =========================================================
-   CONTROLS
-========================================================= */
 
 .controls {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-
   gap: 10px;
-
   margin-top: 14px;
 }
 
 button {
   min-height: 46px;
-
   padding: 10px 12px;
-
   color: #ffffff;
   background: #24272e;
-
   border: 1px solid #3a3f49;
   border-radius: 9px;
-
   cursor: pointer;
 }
 
@@ -169,16 +125,10 @@ button:disabled {
   cursor: default;
 }
 
-/* =========================================================
-   DEBUG
-========================================================= */
-
 .debug-panel {
   margin-top: 20px;
   padding: 16px;
-
   background: #17191e;
-
   border: 1px solid #30343c;
   border-radius: 12px;
 }
@@ -191,11 +141,8 @@ button:disabled {
 .debug-row {
   display: flex;
   justify-content: space-between;
-
   gap: 20px;
-
   padding: 7px 0;
-
   border-bottom: 1px solid #24272e;
 }
 
@@ -210,12 +157,9 @@ button:disabled {
 
 .debug-row span {
   max-width: 60%;
-
   color: #8ee99a;
-
   font-size: 13px;
   text-align: right;
-
   overflow-wrap: anywhere;
 }
 

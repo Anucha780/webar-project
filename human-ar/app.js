@@ -6,21 +6,17 @@ import {
 import * as THREE
   from "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js";
 
+import { GLTFLoader }
+  from "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/loaders/GLTFLoader.js";
+
 /* =========================================================
    DOM
 ========================================================= */
 
-const video =
-  document.querySelector("#camera");
-
-const threeLayer =
-  document.querySelector("#three-layer");
-
-const overlay =
-  document.querySelector("#pose-overlay");
-
-const ctx =
-  overlay.getContext("2d");
+const video = document.querySelector("#camera");
+const threeLayer = document.querySelector("#three-layer");
+const overlay = document.querySelector("#pose-overlay");
+const ctx = overlay.getContext("2d");
 
 const placeholder =
   document.querySelector("#camera-placeholder");
@@ -37,35 +33,44 @@ const stopButton =
 const statusElement =
   document.querySelector("#status");
 
-const cameraStatus =
-  document.querySelector("#camera-status");
-
-const facingStatus =
-  document.querySelector("#facing-status");
-
-const resolutionStatus =
-  document.querySelector("#resolution-status");
-
 const mediapipeStatus =
   document.querySelector("#mediapipe-status");
-
-const personStatus =
-  document.querySelector("#person-status");
-
-const fpsStatus =
-  document.querySelector("#fps-status");
 
 const threeStatus =
   document.querySelector("#three-status");
 
+const glbPathStatus =
+  document.querySelector("#glb-path-status");
+
+const glbLoadStatus =
+  document.querySelector("#glb-load-status");
+
+const meshStatus =
+  document.querySelector("#mesh-status");
+
+const materialStatus =
+  document.querySelector("#material-status");
+
+const bboxStatus =
+  document.querySelector("#bbox-status");
+
+const sizeStatus =
+  document.querySelector("#size-status");
+
+const animationStatus =
+  document.querySelector("#animation-status");
+
+const clipStatus =
+  document.querySelector("#clip-status");
+
+const cameraStatus =
+  document.querySelector("#camera-status");
+
+const personStatus =
+  document.querySelector("#person-status");
+
 const anchorStatus =
   document.querySelector("#anchor-status");
-
-const leftShoulderStatus =
-  document.querySelector("#left-shoulder-status");
-
-const rightShoulderStatus =
-  document.querySelector("#right-shoulder-status");
 
 const errorStatus =
   document.querySelector("#error-status");
@@ -76,45 +81,48 @@ const errorStatus =
 ========================================================= */
 
 let stream = null;
-
 let facingMode = "user";
 
 let poseLandmarker = null;
 
 let cameraRunning = false;
-
 let animationFrameId = null;
-
 let lastVideoTime = -1;
-
-let frameCounter = 0;
-
-let fpsTimer = performance.now();
 
 
 /* =========================================================
-   THREE.JS STATE
+   THREE.JS
 ========================================================= */
 
 let scene = null;
-
 let threeCamera = null;
-
 let renderer = null;
 
-let sphere = null;
+let testSphere = null;
+
+let loadedModel = null;
+
+let mixer = null;
+
+const clock =
+  new THREE.Clock();
 
 
 /* =========================================================
-   LANDMARK INDEXES
+   GLB
+========================================================= */
+
+const MODEL_PATH =
+  "./models/test-model.glb";
+
+
+/* =========================================================
+   LANDMARKS
 ========================================================= */
 
 const LANDMARK = {
-  NOSE: 0,
-
   LEFT_SHOULDER: 11,
   RIGHT_SHOULDER: 12,
-
   LEFT_HIP: 23,
   RIGHT_HIP: 24
 };
@@ -146,173 +154,455 @@ function setError(error) {
 
 
 /* =========================================================
-   THREE.JS INITIALIZATION
+   THREE INITIALIZATION
 ========================================================= */
 
 function initializeThree() {
 
-  try {
+  threeStatus.textContent =
+    "Initializing...";
 
-    threeStatus.textContent =
-      "Initializing...";
+  scene =
+    new THREE.Scene();
 
-    scene =
-      new THREE.Scene();
-
-
-    /*
-      Orthographic camera is intentional.
-
-      M4 is screen-space body tracking.
-
-      Using an orthographic camera makes
-      screen coordinate → Three.js coordinate
-      mapping deterministic.
-    */
-
-    threeCamera =
-      new THREE.OrthographicCamera(
-        0,
-        1,
-        1,
-        0,
-        -100,
-        100
-      );
-
-    threeCamera.position.z =
-      10;
-
-
-    renderer =
-      new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: true
-      });
-
-    renderer.setClearColor(
-      0x000000,
-      0
+  threeCamera =
+    new THREE.OrthographicCamera(
+      0,
+      1,
+      1,
+      0,
+      -100,
+      100
     );
 
-    renderer.setPixelRatio(
-      Math.min(
-        window.devicePixelRatio || 1,
-        2
-      )
-    );
+  threeCamera.position.z =
+    10;
 
-    threeLayer.appendChild(
-      renderer.domElement
-    );
+  renderer =
+    new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true
+    });
 
+  renderer.setClearColor(
+    0x000000,
+    0
+  );
 
-    /*
-      Test primitive.
+  renderer.setPixelRatio(
+    Math.min(
+      window.devicePixelRatio || 1,
+      2
+    )
+  );
 
-      We deliberately use a basic sphere
-      before introducing GLB.
-    */
-
-    const geometry =
-      new THREE.SphereGeometry(
-        0.045,
-        32,
-        24
-      );
-
-    const material =
-      new THREE.MeshNormalMaterial();
-
-    sphere =
-      new THREE.Mesh(
-        geometry,
-        material
-      );
-
-    sphere.visible =
-      false;
-
-    sphere.position.z =
-      0;
-
-    scene.add(
-      sphere
-    );
-
-    resizeThree();
-
-    renderer.render(
-      scene,
-      threeCamera
-    );
-
-    threeStatus.textContent =
-      `Ready r${THREE.REVISION}`;
-
-    console.log(
-      `[Human AR] Three.js revision ${THREE.REVISION}`
-    );
-
-  } catch (error) {
-
-    threeStatus.textContent =
-      "Failed";
-
-    setError(error);
-
-    throw error;
-  }
-}
-
-
-/* =========================================================
-   THREE.JS RESIZE
-========================================================= */
-
-function resizeThree() {
-
-  if (
-    !renderer ||
-    !threeCamera
-  ) {
-    return;
-  }
-
-  const rect =
-    threeLayer.getBoundingClientRect();
-
-  if (
-    rect.width <= 0 ||
-    rect.height <= 0
-  ) {
-    return;
-  }
-
-  renderer.setSize(
-    rect.width,
-    rect.height,
-    false
+  threeLayer.appendChild(
+    renderer.domElement
   );
 
 
   /*
-    Coordinate system:
+    Keep the primitive from M4.
 
-    X: 0 → 1
-    Y: 0 → 1
-
-    This matches normalized screen-space
-    coordinates.
+    This stays as our known-good
+    reference object.
   */
 
-  threeCamera.left = 0;
-  threeCamera.right = 1;
+  const sphereGeometry =
+    new THREE.SphereGeometry(
+      0.04,
+      24,
+      16
+    );
 
-  threeCamera.top = 1;
-  threeCamera.bottom = 0;
+  const sphereMaterial =
+    new THREE.MeshNormalMaterial();
 
-  threeCamera.updateProjectionMatrix();
+  testSphere =
+    new THREE.Mesh(
+      sphereGeometry,
+      sphereMaterial
+    );
+
+  testSphere.visible =
+    false;
+
+  scene.add(
+    testSphere
+  );
+
+
+  /*
+    Basic lights for GLB materials.
+  */
+
+  const ambient =
+    new THREE.AmbientLight(
+      0xffffff,
+      1.8
+    );
+
+  scene.add(
+    ambient
+  );
+
+  const directional =
+    new THREE.DirectionalLight(
+      0xffffff,
+      2
+    );
+
+  directional.position.set(
+    1,
+    2,
+    3
+  );
+
+  scene.add(
+    directional
+  );
+
+  resizeThree();
+
+  threeStatus.textContent =
+    `Ready r${THREE.REVISION}`;
+}
+
+
+/* =========================================================
+   GLB VALIDATION
+========================================================= */
+
+function loadAndValidateGLB() {
+
+  glbPathStatus.textContent =
+    MODEL_PATH;
+
+  glbLoadStatus.textContent =
+    "Loading...";
+
+  const loader =
+    new GLTFLoader();
+
+  loader.load(
+
+    MODEL_PATH,
+
+    (gltf) => {
+
+      console.log(
+        "[GLB] Loaded",
+        gltf
+      );
+
+
+      /* -----------------------------
+         1. Scene
+      ----------------------------- */
+
+      if (!gltf.scene) {
+
+        throw new Error(
+          "GLB has no scene"
+        );
+      }
+
+
+      /* -----------------------------
+         2. Mesh inspection
+      ----------------------------- */
+
+      let meshCount = 0;
+      let materialCount = 0;
+
+      const materials =
+        new Set();
+
+      gltf.scene.traverse(
+        (object) => {
+
+          if (object.isMesh) {
+
+            meshCount++;
+
+            console.log(
+              "[GLB Mesh]",
+              object.name || "(unnamed)",
+              object.geometry
+            );
+
+            if (object.material) {
+
+              if (
+                Array.isArray(
+                  object.material
+                )
+              ) {
+
+                for (
+                  const material
+                  of object.material
+                ) {
+
+                  materials.add(
+                    material
+                  );
+
+                }
+
+              } else {
+
+                materials.add(
+                  object.material
+                );
+              }
+            }
+          }
+        }
+      );
+
+      materialCount =
+        materials.size;
+
+      meshStatus.textContent =
+        String(meshCount);
+
+      materialStatus.textContent =
+        String(materialCount);
+
+
+      /* -----------------------------
+         3. Bounding Box
+      ----------------------------- */
+
+      const box =
+        new THREE.Box3()
+          .setFromObject(
+            gltf.scene
+          );
+
+      if (box.isEmpty()) {
+
+        bboxStatus.textContent =
+          "EMPTY";
+
+        throw new Error(
+          "GLB bounding box is empty"
+        );
+      }
+
+      const size =
+        new THREE.Vector3();
+
+      const center =
+        new THREE.Vector3();
+
+      box.getSize(
+        size
+      );
+
+      box.getCenter(
+        center
+      );
+
+      bboxStatus.textContent =
+        "Valid";
+
+      sizeStatus.textContent =
+        `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
+
+      console.log(
+        "[GLB Bounding Box]",
+        box
+      );
+
+      console.log(
+        "[GLB Size]",
+        size
+      );
+
+      console.log(
+        "[GLB Center]",
+        center
+      );
+
+
+      /* -----------------------------
+         4. Center model
+      ----------------------------- */
+
+      gltf.scene.position.sub(
+        center
+      );
+
+
+      /* -----------------------------
+         5. Normalize scale
+
+         Validation only.
+
+         We scale the longest axis
+         to approximately 0.18 scene units.
+      ----------------------------- */
+
+      const maxDimension =
+        Math.max(
+          size.x,
+          size.y,
+          size.z
+        );
+
+      if (
+        maxDimension <= 0 ||
+        !Number.isFinite(
+          maxDimension
+        )
+      ) {
+
+        throw new Error(
+          "Invalid GLB dimensions"
+        );
+      }
+
+      const normalizedScale =
+        0.18 /
+        maxDimension;
+
+      gltf.scene.scale.setScalar(
+        normalizedScale
+      );
+
+
+      /* -----------------------------
+         6. Animations
+      ----------------------------- */
+
+      const animations =
+        gltf.animations || [];
+
+      animationStatus.textContent =
+        `${animations.length}`;
+
+      if (
+        animations.length > 0
+      ) {
+
+        const names =
+          animations.map(
+            (clip, index) =>
+              clip.name ||
+              `Clip ${index}`
+          );
+
+        clipStatus.textContent =
+          names.join(", ");
+
+        console.log(
+          "[GLB Animations]",
+          animations
+        );
+
+        /*
+          IMPORTANT:
+
+          We deliberately do NOT
+          automatically choose an
+          animation yet.
+
+          M5 only validates clips.
+        */
+
+      } else {
+
+        clipStatus.textContent =
+          "None";
+      }
+
+
+      /* -----------------------------
+         7. Add to scene
+
+         Display near screen center
+         for visual validation only.
+      ----------------------------- */
+
+      loadedModel =
+        gltf.scene;
+
+      loadedModel.position.set(
+        0.5,
+        0.5,
+        0
+      );
+
+      loadedModel.visible =
+        true;
+
+      scene.add(
+        loadedModel
+      );
+
+      glbLoadStatus.textContent =
+        "PASS";
+
+      setStatus(
+        "GLB validated"
+      );
+
+      renderer.render(
+        scene,
+        threeCamera
+      );
+
+    },
+
+    (progress) => {
+
+      if (
+        progress.total > 0
+      ) {
+
+        const percent =
+          Math.round(
+            (
+              progress.loaded /
+              progress.total
+            ) *
+            100
+          );
+
+        glbLoadStatus.textContent =
+          `${percent}%`;
+
+      } else {
+
+        glbLoadStatus.textContent =
+          "Loading...";
+      }
+
+    },
+
+    (error) => {
+
+      console.error(
+        "[GLB Load Error]",
+        error
+      );
+
+      glbLoadStatus.textContent =
+        "FAILED";
+
+      setError(
+        new Error(
+          "Unable to load GLB"
+        )
+      );
+
+      setStatus(
+        "GLB validation failed"
+      );
+    }
+  );
 }
 
 
@@ -366,9 +656,21 @@ async function initializePose() {
     mediapipeStatus.textContent =
       "Ready";
 
-    setStatus(
-      "Pose + Three.js ready — start camera"
-    );
+    if (
+      glbLoadStatus.textContent ===
+      "PASS"
+    ) {
+
+      setStatus(
+        "M5 ready — start camera"
+      );
+
+    } else {
+
+      setStatus(
+        "Pose ready — validating GLB"
+      );
+    }
 
     startButton.disabled =
       false;
@@ -378,7 +680,9 @@ async function initializePose() {
     mediapipeStatus.textContent =
       "Failed";
 
-    setError(error);
+    setError(
+      error
+    );
 
     setStatus(
       "MediaPipe failed"
@@ -412,7 +716,7 @@ function updateCameraDisplay() {
 
 
 /* =========================================================
-   START CAMERA
+   CAMERA START
 ========================================================= */
 
 async function startCamera() {
@@ -423,7 +727,7 @@ async function startCamera() {
   ) {
 
     setStatus(
-      "Tracking system is not ready"
+      "System is not ready"
     );
 
     return;
@@ -432,21 +736,12 @@ async function startCamera() {
   errorStatus.textContent =
     "None";
 
-  setStatus(
-    "Requesting camera..."
-  );
-
   startButton.disabled =
     true;
 
   try {
 
-    if (stream) {
-      stopStream();
-    }
-
     const constraints = {
-
       audio: false,
 
       video: {
@@ -496,13 +791,7 @@ async function startCamera() {
     cameraStatus.textContent =
       "Running";
 
-    facingStatus.textContent =
-      facingMode;
-
-    updateResolution();
-
     resizeOverlay();
-
     resizeThree();
 
     startButton.disabled =
@@ -518,57 +807,29 @@ async function startCamera() {
       -1;
 
     setStatus(
-      "Camera + Pose + Three.js running"
+      "Camera + Pose running"
     );
 
-    startPoseLoop();
+    predictPose();
 
   } catch (error) {
 
-    cameraRunning =
-      false;
-
-    stream =
-      null;
-
-    setError(error);
+    setError(
+      error
+    );
 
     setStatus(
       "Camera failed"
     );
 
-    video.style.display =
-      "none";
-
-    threeLayer.style.display =
-      "none";
-
-    overlay.style.display =
-      "none";
-
-    placeholder.style.display =
-      "flex";
-
-    placeholder.textContent =
-      "Camera unavailable";
-
-    cameraStatus.textContent =
-      "Failed";
-
     startButton.disabled =
       false;
-
-    switchButton.disabled =
-      true;
-
-    stopButton.disabled =
-      true;
   }
 }
 
 
 /* =========================================================
-   STOP
+   STOP / SWITCH
 ========================================================= */
 
 function stopStream() {
@@ -614,32 +875,11 @@ function stopStream() {
   overlay.style.display =
     "none";
 
-  if (sphere) {
-    sphere.visible = false;
+  if (testSphere) {
+
+    testSphere.visible =
+      false;
   }
-
-  anchorStatus.textContent =
-    "Hidden";
-
-  clearOverlay();
-
-  if (
-    renderer &&
-    scene &&
-    threeCamera
-  ) {
-
-    renderer.render(
-      scene,
-      threeCamera
-    );
-  }
-
-  placeholder.style.display =
-    "flex";
-
-  placeholder.textContent =
-    "Camera stopped";
 
   cameraStatus.textContent =
     "Stopped";
@@ -647,17 +887,14 @@ function stopStream() {
   personStatus.textContent =
     "Not detected";
 
-  fpsStatus.textContent =
-    "—";
+  anchorStatus.textContent =
+    "Hidden";
 
-  leftShoulderStatus.textContent =
-    "—";
+  placeholder.style.display =
+    "flex";
 
-  rightShoulderStatus.textContent =
-    "—";
-
-  resolutionStatus.textContent =
-    "—";
+  placeholder.textContent =
+    "Camera stopped";
 
   switchButton.disabled =
     true;
@@ -680,23 +917,12 @@ function stopCamera() {
 }
 
 
-/* =========================================================
-   SWITCH CAMERA
-========================================================= */
-
 async function switchCamera() {
 
   facingMode =
     facingMode === "user"
       ? "environment"
       : "user";
-
-  facingStatus.textContent =
-    facingMode;
-
-  setStatus(
-    `Switching to ${facingMode} camera...`
-  );
 
   stopStream();
 
@@ -705,26 +931,8 @@ async function switchCamera() {
 
 
 /* =========================================================
-   SIZE
+   RESIZE
 ========================================================= */
-
-function updateResolution() {
-
-  if (
-    video.videoWidth &&
-    video.videoHeight
-  ) {
-
-    resolutionStatus.textContent =
-      `${video.videoWidth} × ${video.videoHeight}`;
-
-  } else {
-
-    resolutionStatus.textContent =
-      "Waiting...";
-  }
-}
-
 
 function resizeOverlay() {
 
@@ -746,19 +954,42 @@ function resizeOverlay() {
 }
 
 
-function clearOverlay() {
+function resizeThree() {
 
-  ctx.clearRect(
-    0,
-    0,
-    overlay.width,
-    overlay.height
+  if (
+    !renderer ||
+    !threeCamera
+  ) {
+    return;
+  }
+
+  const rect =
+    threeLayer.getBoundingClientRect();
+
+  if (
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
+    return;
+  }
+
+  renderer.setSize(
+    rect.width,
+    rect.height,
+    false
   );
+
+  threeCamera.left = 0;
+  threeCamera.right = 1;
+  threeCamera.top = 1;
+  threeCamera.bottom = 0;
+
+  threeCamera.updateProjectionMatrix();
 }
 
 
 /* =========================================================
-   OBJECT-FIT COVER TRANSFORM
+   COVER TRANSFORM
 ========================================================= */
 
 function getCoverTransform() {
@@ -781,7 +1012,6 @@ function getCoverTransform() {
     !displayWidth ||
     !displayHeight
   ) {
-
     return null;
   }
 
@@ -815,21 +1045,14 @@ function getCoverTransform() {
   return {
     sourceWidth,
     sourceHeight,
-
     displayWidth,
     displayHeight,
-
     scale,
-
     cropX,
     cropY
   };
 }
 
-
-/* =========================================================
-   MEDIAPIPE → CANVAS
-========================================================= */
 
 function landmarkToCanvas(
   landmark
@@ -863,43 +1086,24 @@ function landmarkToCanvas(
       sourceX;
   }
 
-  const x =
-    sourceX *
-    transform.scale -
-    transform.cropX;
-
-  const y =
-    sourceY *
-    transform.scale -
-    transform.cropY;
-
   return {
-    x,
-    y
+
+    x:
+      sourceX *
+        transform.scale -
+      transform.cropX,
+
+    y:
+      sourceY *
+        transform.scale -
+      transform.cropY
   };
 }
 
 
-/* =========================================================
-   CANVAS → THREE SCREEN SPACE
-========================================================= */
-
 function canvasToThree(
   point
 ) {
-
-  /*
-    Canvas:
-      x = 0 → width
-      y = 0 → height
-
-    Three orthographic scene:
-      x = 0 → 1
-      y = 0 → 1
-
-    Canvas Y grows downward.
-    Three Y grows upward.
-  */
 
   return {
 
@@ -918,10 +1122,10 @@ function canvasToThree(
 
 
 /* =========================================================
-   UPDATE 3D SPHERE
+   POSE → TEST SPHERE
 ========================================================= */
 
-function updateThreeAnchor(
+function updateAnchor(
   landmarks
 ) {
 
@@ -945,11 +1149,6 @@ function updateThreeAnchor(
       LANDMARK.RIGHT_HIP
     ];
 
-
-  /*
-    Synthetic torso center.
-  */
-
   const torso = {
 
     x:
@@ -968,313 +1167,28 @@ function updateThreeAnchor(
         rightHip.y
       ) / 4
   };
-
-
-  /*
-    Use exactly the SAME mapping as
-    the debug overlay.
-  */
 
   const canvasPoint =
     landmarkToCanvas(
       torso
     );
 
-  const threePoint =
+  const point =
     canvasToThree(
       canvasPoint
     );
 
+  testSphere.visible =
+    true;
 
-  /*
-    Do not show an object that has moved
-    completely outside the visible viewport.
-  */
-
-  const visible =
-    threePoint.x >= 0 &&
-    threePoint.x <= 1 &&
-    threePoint.y >= 0 &&
-    threePoint.y <= 1;
-
-  sphere.visible =
-    visible;
-
-  if (!visible) {
-
-    anchorStatus.textContent =
-      "Outside view";
-
-    return;
-  }
-
-
-  sphere.position.set(
-    threePoint.x,
-    threePoint.y,
+  testSphere.position.set(
+    point.x,
+    point.y,
     0
   );
 
-
-  /*
-    Rotate it slowly so we can visually
-    confirm that this is a real Three.js
-    3D mesh, not a 2D circle.
-  */
-
-  sphere.rotation.x +=
-    0.025;
-
-  sphere.rotation.y +=
-    0.035;
-
   anchorStatus.textContent =
-    `TORSO x ${threePoint.x.toFixed(3)}, y ${threePoint.y.toFixed(3)}`;
-}
-
-
-/* =========================================================
-   DEBUG DRAWING
-========================================================= */
-
-function drawPoint(
-  landmark,
-  label
-) {
-
-  const point =
-    landmarkToCanvas(
-      landmark
-    );
-
-  const dpr =
-    window.devicePixelRatio || 1;
-
-  const radius =
-    6 * dpr;
-
-  ctx.beginPath();
-
-  ctx.arc(
-    point.x,
-    point.y,
-    radius,
-    0,
-    Math.PI * 2
-  );
-
-  ctx.fillStyle =
-    "#00ff88";
-
-  ctx.fill();
-
-  ctx.font =
-    `${11 * dpr}px Arial`;
-
-  ctx.fillStyle =
-    "#ffffff";
-
-  ctx.fillText(
-    label,
-    point.x +
-      radius +
-      3 * dpr,
-
-    point.y -
-      3 * dpr
-  );
-}
-
-
-function drawLine(
-  landmarkA,
-  landmarkB
-) {
-
-  const a =
-    landmarkToCanvas(
-      landmarkA
-    );
-
-  const b =
-    landmarkToCanvas(
-      landmarkB
-    );
-
-  const dpr =
-    window.devicePixelRatio || 1;
-
-  ctx.beginPath();
-
-  ctx.moveTo(
-    a.x,
-    a.y
-  );
-
-  ctx.lineTo(
-    b.x,
-    b.y
-  );
-
-  ctx.strokeStyle =
-    "#00ff88";
-
-  ctx.lineWidth =
-    2 * dpr;
-
-  ctx.stroke();
-}
-
-
-/* =========================================================
-   DRAW POSE
-========================================================= */
-
-function drawPose(
-  landmarks
-) {
-
-  clearOverlay();
-
-  const nose =
-    landmarks[
-      LANDMARK.NOSE
-    ];
-
-  const leftShoulder =
-    landmarks[
-      LANDMARK.LEFT_SHOULDER
-    ];
-
-  const rightShoulder =
-    landmarks[
-      LANDMARK.RIGHT_SHOULDER
-    ];
-
-  const leftHip =
-    landmarks[
-      LANDMARK.LEFT_HIP
-    ];
-
-  const rightHip =
-    landmarks[
-      LANDMARK.RIGHT_HIP
-    ];
-
-  drawLine(
-    leftShoulder,
-    rightShoulder
-  );
-
-  drawLine(
-    leftShoulder,
-    leftHip
-  );
-
-  drawLine(
-    rightShoulder,
-    rightHip
-  );
-
-  drawLine(
-    leftHip,
-    rightHip
-  );
-
-  drawPoint(
-    nose,
-    "HEAD"
-  );
-
-  drawPoint(
-    leftShoulder,
-    "L SHOULDER"
-  );
-
-  drawPoint(
-    rightShoulder,
-    "R SHOULDER"
-  );
-
-  drawPoint(
-    leftHip,
-    "L HIP"
-  );
-
-  drawPoint(
-    rightHip,
-    "R HIP"
-  );
-
-  const torso = {
-
-    x:
-      (
-        leftShoulder.x +
-        rightShoulder.x +
-        leftHip.x +
-        rightHip.x
-      ) / 4,
-
-    y:
-      (
-        leftShoulder.y +
-        rightShoulder.y +
-        leftHip.y +
-        rightHip.y
-      ) / 4
-  };
-
-  drawPoint(
-    torso,
-    "TORSO"
-  );
-
-  leftShoulderStatus.textContent =
-    `x ${leftShoulder.x.toFixed(3)}, y ${leftShoulder.y.toFixed(3)}`;
-
-  rightShoulderStatus.textContent =
-    `x ${rightShoulder.x.toFixed(3)}, y ${rightShoulder.y.toFixed(3)}`;
-}
-
-
-/* =========================================================
-   FPS
-========================================================= */
-
-function updateFPS() {
-
-  frameCounter++;
-
-  const now =
-    performance.now();
-
-  const elapsed =
-    now -
-    fpsTimer;
-
-  if (
-    elapsed >= 1000
-  ) {
-
-    const fps =
-      Math.round(
-        (
-          frameCounter *
-          1000
-        ) /
-        elapsed
-      );
-
-    fpsStatus.textContent =
-      `${fps}`;
-
-    frameCounter =
-      0;
-
-    fpsTimer =
-      now;
-  }
+    `TORSO ${point.x.toFixed(3)}, ${point.y.toFixed(3)}`;
 }
 
 
@@ -1282,25 +1196,12 @@ function updateFPS() {
    POSE LOOP
 ========================================================= */
 
-function startPoseLoop() {
-
-  if (
-    !cameraRunning
-  ) {
-    return;
-  }
-
-  predictPose();
-}
-
-
 function predictPose() {
 
   if (
     !cameraRunning ||
     !poseLandmarker
   ) {
-
     return;
   }
 
@@ -1313,89 +1214,64 @@ function predictPose() {
     lastVideoTime =
       video.currentTime;
 
-    try {
-
-      const result =
-        poseLandmarker
-          .detectForVideo(
-            video,
-            performance.now()
-          );
-
-      if (
-        result.landmarks &&
-        result.landmarks.length > 0
-      ) {
-
-        personStatus.textContent =
-          "Detected";
-
-        const landmarks =
-          result.landmarks[0];
-
-        drawPose(
-          landmarks
-        );
-
-        updateThreeAnchor(
-          landmarks
-        );
-
-      } else {
-
-        personStatus.textContent =
-          "Not detected";
-
-        leftShoulderStatus.textContent =
-          "—";
-
-        rightShoulderStatus.textContent =
-          "—";
-
-        clearOverlay();
-
-        if (sphere) {
-          sphere.visible = false;
-        }
-
-        anchorStatus.textContent =
-          "Hidden";
-      }
-
-      updateFPS();
-
-    } catch (error) {
-
-      setError(error);
-
-      setStatus(
-        "Pose detection error"
+    const result =
+      poseLandmarker.detectForVideo(
+        video,
+        performance.now()
       );
 
-      cameraRunning =
-        false;
+    if (
+      result.landmarks &&
+      result.landmarks.length > 0
+    ) {
 
-      return;
+      personStatus.textContent =
+        "Detected";
+
+      updateAnchor(
+        result.landmarks[0]
+      );
+
+    } else {
+
+      personStatus.textContent =
+        "Not detected";
+
+      testSphere.visible =
+        false;
     }
   }
 
 
   /*
-    Render Three.js every animation frame.
+    M5 visual validation:
+
+    Rotate GLB slowly in the screen center
+    so we can inspect materials/geometry.
   */
 
-  if (
-    renderer &&
-    scene &&
-    threeCamera
-  ) {
+  if (loadedModel) {
 
-    renderer.render(
-      scene,
-      threeCamera
+    loadedModel.rotation.y +=
+      0.01;
+  }
+
+
+  if (mixer) {
+
+    const delta =
+      clock.getDelta();
+
+    mixer.update(
+      delta
     );
   }
 
+
+  renderer.render(
+    scene,
+    threeCamera
+  );
 
   animationFrameId =
     requestAnimationFrame(
@@ -1423,32 +1299,12 @@ stopButton.addEventListener(
   stopCamera
 );
 
-
-video.addEventListener(
-  "loadedmetadata",
-  () => {
-
-    updateResolution();
-
-    resizeOverlay();
-
-    resizeThree();
-  }
-);
-
-
 window.addEventListener(
   "resize",
   () => {
 
-    if (
-      cameraRunning
-    ) {
-
-      resizeOverlay();
-
-      resizeThree();
-    }
+    resizeOverlay();
+    resizeThree();
   }
 );
 
@@ -1458,36 +1314,27 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 4 initialized"
+  "[Human AR] Milestone 5 initialized"
 );
 
 startButton.disabled =
   true;
 
-
-/*
-  Initialize Three.js synchronously first.
-
-  If this fails, we do NOT proceed silently.
-*/
-
 try {
 
   initializeThree();
 
+  loadAndValidateGLB();
+
 } catch (error) {
 
-  setStatus(
-    "Three.js failed"
+  setError(
+    error
   );
 
-  startButton.disabled =
-    true;
+  setStatus(
+    "Three.js initialization failed"
+  );
 }
-
-
-/*
-  MediaPipe initialization remains independent.
-*/
 
 initializePose();

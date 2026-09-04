@@ -33,7 +33,7 @@ export const MODEL_REGISTRY = [
 
     behavior: "BESIDE",
 
-    scaleMultiplier: 1.15,
+    scaleMultiplier: 1.35,
 
     rotation: {
       x: 0,
@@ -44,9 +44,9 @@ export const MODEL_REGISTRY = [
     animationIndex: 0,
 
     beside: {
-      side: "right",
-      distance: 1.2,
-      offsetY: -0.1
+        side: "right",
+        distance: 1.05,
+        offsetY: -0.18
     }
   }
 

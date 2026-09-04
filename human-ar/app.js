@@ -53,6 +53,10 @@ const modelToggleContainer =
   );
 
 
+const modelToggleElements =
+  new Map();
+
+
 
 const startButton =
   document.querySelector("#start-camera");

@@ -168,11 +168,26 @@ let allModelsReady =
   false;
 
 
-const enabledEffects = {
-  butterfly: true,
-  waveboy: true,
-  stars: true
-};
+const enabledEffects =
+  Object.fromEntries(
+    MODEL_REGISTRY.map(
+      rawConfig => {
+
+        const config =
+          normalizeModelConfig(
+            rawConfig
+          );
+
+        return [
+          config.id,
+          config.enabled
+        ];
+      }
+    )
+  );
+
+enabledEffects.stars =
+  true;
 
 /* =========================================================
    BODY EFFECT — STARS

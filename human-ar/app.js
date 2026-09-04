@@ -47,36 +47,11 @@ const placeholder =
   document.querySelector("#camera-placeholder");
 
 
-const modelToggleElements =
-  new Map();
+const modelToggleContainer =
+  document.querySelector(
+    "#model-toggle-container"
+  );
 
-
-for (
-  const rawConfig
-  of MODEL_REGISTRY
-) {
-
-  const config =
-    normalizeModelConfig(
-      rawConfig
-    );
-
-  const toggleElement =
-    document.querySelector(
-      `#toggle-${config.id}`
-    );
-
-
-  if (
-    toggleElement
-  ) {
-
-    modelToggleElements.set(
-      config.id,
-      toggleElement
-    );
-  }
-}
 
 
 const startButton =
@@ -213,6 +188,89 @@ const enabledEffects =
 
 enabledEffects.stars =
   true;
+
+
+function createModelToggles() {
+
+  modelToggleElements.clear();
+
+
+  modelToggleContainer.innerHTML =
+    "";
+
+
+  const configs =
+    MODEL_REGISTRY
+      .map(
+        rawConfig =>
+          normalizeModelConfig(
+            rawConfig
+          )
+      )
+      .filter(
+        config =>
+          config.toggleable
+      )
+      .sort(
+        (a, b) =>
+          a.ui.order -
+          b.ui.order
+      );
+
+
+  for (
+    const config
+    of configs
+  ) {
+
+    const label =
+      document.createElement(
+        "label"
+      );
+
+
+    const toggleElement =
+      document.createElement(
+        "input"
+      );
+
+
+    toggleElement.type =
+      "checkbox";
+
+
+    toggleElement.id =
+      `toggle-${config.id}`;
+
+
+    toggleElement.checked =
+      effectIsEnabled(
+        config.id
+      );
+
+
+    label.appendChild(
+      toggleElement
+    );
+
+
+    label.append(
+      ` ${config.ui.label}`
+    );
+
+
+    modelToggleContainer.appendChild(
+      label
+    );
+
+
+    modelToggleElements.set(
+      config.id,
+      toggleElement
+    );
+  }
+}  
+
 
 /* =========================================================
    BODY EFFECT — STARS

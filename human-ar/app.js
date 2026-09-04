@@ -5032,6 +5032,7 @@ stopButton.addEventListener(
   stopCamera
 );
 
+createModelToggles();
 
 for (
   const rawConfig
@@ -5142,7 +5143,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 8.6B — Effect Toggles"
+  "[Human AR] Milestone 8.11 — Registry Architecture"
 );
 
 
@@ -5172,10 +5173,20 @@ for (
       rawConfig
     );
 
+
+  if (
+    !config.toggleable
+  ) {
+
+    continue;
+  }
+
+
   const toggleElement =
-    document.querySelector(
-      `#toggle-${config.id}`
+    modelToggleElements.get(
+      config.id
     );
+
 
   if (
     !toggleElement

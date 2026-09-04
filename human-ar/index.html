@@ -8,7 +8,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   />
 
-  <title>Human AR — M8.6B Effect Toggles</title>
+  <title>Human AR — M8.7A Stars Body Effect</title>
 
   <link rel="stylesheet" href="./style.css" />
 
@@ -36,7 +36,7 @@
       </a>
 
       <div class="milestone">
-        Human AR — M8.6B
+        Human AR — M8.7A
       </div>
 
     </div>
@@ -52,7 +52,7 @@
       ></video>
 
       <div id="three-layer"></div>
-
+      <canvas id="effect-overlay"></canvas>
       <canvas id="pose-overlay"></canvas>
 
       <div
@@ -89,8 +89,18 @@
         />
 
         Waveboy
+        </label>
 
-      </label>
+      <label>
+         <input
+            type="checkbox"
+            id="toggle-stars"
+            checked
+        />
+        Stars
+        </label>
+      
+       </label>
 
     </div>
 

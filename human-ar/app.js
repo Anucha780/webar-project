@@ -28,6 +28,15 @@ const threeLayer =
 const overlay =
   document.querySelector("#pose-overlay");
 
+const effectOverlay =
+  document.querySelector("#effect-overlay");
+
+const effectCtx =
+  effectOverlay.getContext("2d");
+
+const starsToggle =
+  document.querySelector("#toggle-stars");
+
 const ctx =
   overlay.getContext("2d");
 
@@ -162,8 +171,301 @@ const enabledEffects = {
     true,
 
   waveboy:
+    true,
+
+  stars:
     true
 };
+
+/* =========================================================
+   BODY EFFECT — STARS
+========================================================= */
+
+const starParticles =
+  [];
+
+const STAR_COUNT =
+  14;
+
+let starsInitialized =
+  false;
+
+function initializeStars() {
+
+  starParticles.length =
+    0;
+
+
+  for (
+    let i = 0;
+    i < STAR_COUNT;
+    i++
+  ) {
+
+    starParticles.push({
+
+      angle:
+        (
+          i /
+          STAR_COUNT
+        ) *
+        Math.PI *
+        2,
+
+      speed:
+        0.45 +
+        Math.random() *
+        0.35,
+
+      radiusMultiplier:
+        0.9 +
+        Math.random() *
+        0.45,
+
+      verticalOffset:
+        -0.45 +
+        Math.random() *
+        0.9,
+
+      size:
+        5 +
+        Math.random() *
+        6,
+
+      phase:
+        Math.random() *
+        Math.PI *
+        2
+    });
+  }
+
+
+  starsInitialized =
+    true;
+}
+
+function drawStarShape(
+  x,
+  y,
+  outerRadius,
+  innerRadius
+) {
+
+  const spikes =
+    5;
+
+
+  let rotation =
+    -Math.PI / 2;
+
+
+  const step =
+    Math.PI /
+    spikes;
+
+
+  effectCtx.beginPath();
+
+
+  effectCtx.moveTo(
+    x +
+    Math.cos(
+      rotation
+    ) *
+    outerRadius,
+
+    y +
+    Math.sin(
+      rotation
+    ) *
+    outerRadius
+  );
+
+
+  for (
+    let i = 0;
+    i < spikes;
+    i++
+  ) {
+
+    effectCtx.lineTo(
+
+      x +
+      Math.cos(
+        rotation
+      ) *
+      outerRadius,
+
+      y +
+      Math.sin(
+        rotation
+      ) *
+      outerRadius
+    );
+
+
+    rotation +=
+      step;
+
+
+    effectCtx.lineTo(
+
+      x +
+      Math.cos(
+        rotation
+      ) *
+      innerRadius,
+
+      y +
+      Math.sin(
+        rotation
+      ) *
+      innerRadius
+    );
+
+
+    rotation +=
+      step;
+  }
+
+
+  effectCtx.closePath();
+
+
+  effectCtx.fillStyle =
+    "rgba(255,255,255,0.95)";
+
+
+  effectCtx.fill();
+}
+
+function drawStarsEffect(
+  timestamp
+) {
+
+  effectCtx.clearRect(
+    0,
+    0,
+    effectOverlay.width,
+    effectOverlay.height
+  );
+
+
+  if (
+    !enabledEffects.stars ||
+    !trackedBody.valid
+  ) {
+
+    return;
+  }
+
+
+  if (
+    !starsInitialized
+  ) {
+
+    initializeStars();
+  }
+
+
+  const centerX =
+    trackedBody.centerX *
+    effectOverlay.width;
+
+
+  const centerY =
+    (
+      1 -
+      trackedBody.centerY
+    ) *
+    effectOverlay.height;
+
+
+  const bodyWidth =
+    trackedBody.shoulderWidth *
+    effectOverlay.width;
+
+
+  const bodyHeight =
+    trackedBody.torsoHeight *
+    effectOverlay.height;
+
+
+  for (
+    const star
+    of starParticles
+  ) {
+
+    const time =
+      timestamp /
+      1000;
+
+
+    const angle =
+      star.angle +
+      time *
+      star.speed;
+
+
+    const radiusX =
+      bodyWidth *
+      1.3 *
+      star.radiusMultiplier;
+
+
+    const radiusY =
+      bodyHeight *
+      0.9 *
+      star.radiusMultiplier;
+
+
+    const x =
+      centerX +
+      Math.cos(
+        angle
+      ) *
+      radiusX;
+
+
+    const y =
+      centerY +
+      star.verticalOffset *
+      bodyHeight +
+      Math.sin(
+        angle * 1.5 +
+        star.phase
+      ) *
+      radiusY *
+      0.35;
+
+
+    const pulse =
+      0.8 +
+      Math.sin(
+        time * 3 +
+        star.phase
+      ) *
+      0.2;
+
+
+    const size =
+      star.size *
+      pulse *
+      (
+        window.devicePixelRatio ||
+        1
+      );
+
+
+    drawStarShape(
+      x,
+      y,
+      size,
+      size * 0.45
+    );
+  }
+}
+
 
 
 /* =========================================================
@@ -451,6 +753,18 @@ function updateEffectDebug() {
     );
   }
 
+  if (
+  enabledEffects.stars
+) {
+
+  names.push(
+    "Stars"
+  );
+
+  behaviors.push(
+    "BODY_EFFECT"
+  );
+}
 
   activeModelStatus.textContent =
     names.length > 0
@@ -1401,6 +1715,8 @@ function updateControls() {
   waveboyToggle.disabled =
     !allModelsReady;
 
+  starsToggle.disabled =
+    !allModelsReady;
 
   switchButton.disabled =
     !cameraRunning;
@@ -1626,6 +1942,8 @@ async function startCamera() {
     threeLayer.style.display =
       "block";
 
+    effectOverlay.style.display =
+      "block";
 
     overlay.style.display =
       "block";
@@ -1797,6 +2115,8 @@ function stopStream() {
   threeLayer.style.display =
     "none";
 
+  effectOverlay.style.display =
+    "none";  
 
   overlay.style.display =
     "none";
@@ -1830,7 +2150,13 @@ function stopStream() {
 
 
   clearOverlay();
-
+  
+  effectCtx.clearRect(
+    0,
+    0,
+    effectOverlay.width,
+    effectOverlay.height
+  );
 
   cameraStatus.textContent =
     "Stopped";
@@ -1913,6 +2239,11 @@ function resizeOverlay() {
       dpr
     );
 
+  effectOverlay.width =
+    overlay.width;
+
+  effectOverlay.height =
+    overlay.height;
 
   compositeCanvas.width =
     overlay.width;
@@ -4121,6 +4452,10 @@ function predictPose() {
   );
 
 
+  drawStarsEffect(
+    now
+  );
+  
   drawOverlay();
 
 
@@ -4210,6 +4545,40 @@ waveboyToggle.addEventListener(
   }
 );
 
+starsToggle.addEventListener(
+  "change",
+  () => {
+
+    enabledEffects.stars =
+      starsToggle.checked;
+
+
+    if (
+      !enabledEffects.stars
+    ) {
+
+      effectCtx.clearRect(
+        0,
+        0,
+        effectOverlay.width,
+        effectOverlay.height
+      );
+    }
+
+
+    updateEffectDebug();
+
+
+    clearError();
+
+
+    setStatus(
+      enabledEffects.stars
+        ? "Stars enabled"
+        : "Stars disabled"
+    );
+  }
+);
 
 video.addEventListener(
   "loadedmetadata",
@@ -4267,6 +4636,8 @@ butterflyToggle.disabled =
 waveboyToggle.disabled =
   true;
 
+starsToggle.disabled =
+  true;
 
 butterflyToggle.checked =
   enabledEffects.butterfly;
@@ -4275,6 +4646,8 @@ butterflyToggle.checked =
 waveboyToggle.checked =
   enabledEffects.waveboy;
 
+starsToggle.checked =
+  enabledEffects.stars;
 
 updateEffectDebug();
 

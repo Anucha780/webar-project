@@ -323,7 +323,7 @@ let orbitDepth =
 
 const trackedBody = {
 
-  valid:
+    valid:
     false,
 
   centerX:
@@ -336,7 +336,19 @@ const trackedBody = {
     0.2,
 
   torsoHeight:
-    0.2
+    0.2,
+
+  leftShoulderX:
+    0.4,
+
+  leftShoulderY:
+    0.4,
+
+  rightShoulderX:
+    0.6,
+
+  rightShoulderY:
+    0.4
 };
 
 
@@ -2405,7 +2417,32 @@ function updateTrackedBody(
       hipCenter
     ) /
     overlay.height;
+  const leftShoulderThree =
+  canvasToThree(
+    ls
+  );
 
+
+const rightShoulderThree =
+  canvasToThree(
+    rs
+  );
+
+
+trackedBody.leftShoulderX =
+  leftShoulderThree.x;
+
+
+trackedBody.leftShoulderY =
+  leftShoulderThree.y;
+
+
+trackedBody.rightShoulderX =
+  rightShoulderThree.x;
+
+
+trackedBody.rightShoulderY =
+  rightShoulderThree.y;
 
   trackedBody.valid =
     true;
@@ -3244,6 +3281,173 @@ function updateBesideBehavior(
     `${activeModelConfig.name} | BESIDE ${sideLabel} | scale ${smoothScale.toFixed(3)}`;
 }
 
+/* =========================================================
+   SHOULDER BEHAVIOR
+========================================================= */
+
+function updateShoulderBehavior(
+  delta
+) {
+
+  if (
+    !trackedBody.valid ||
+    !activeModelConfig
+  ) {
+
+    modelAnchor.visible =
+      false;
+
+    return;
+  }
+
+
+  orbitDepth =
+    0;
+
+
+  const shoulder =
+    activeModelConfig.shoulder || {};
+
+
+  const side =
+    shoulder.side === "left"
+      ? "left"
+      : "right";
+
+
+  const offsetX =
+    Number.isFinite(
+      shoulder.offsetX
+    )
+      ? shoulder.offsetX
+      : 0.3;
+
+
+  const offsetY =
+    Number.isFinite(
+      shoulder.offsetY
+    )
+      ? shoulder.offsetY
+      : 0.1;
+
+
+  let targetX;
+  let targetY;
+
+
+  if (
+    side === "left"
+  ) {
+
+    targetX =
+      trackedBody.leftShoulderX -
+      trackedBody.shoulderWidth *
+      offsetX;
+
+
+    targetY =
+      trackedBody.leftShoulderY +
+      trackedBody.torsoHeight *
+      offsetY;
+
+  } else {
+
+    targetX =
+      trackedBody.rightShoulderX +
+      trackedBody.shoulderWidth *
+      offsetX;
+
+
+    targetY =
+      trackedBody.rightShoulderY +
+      trackedBody.torsoHeight *
+      offsetY;
+  }
+
+
+  const bodyReference =
+    (
+      trackedBody.shoulderWidth *
+      0.65
+      +
+      trackedBody.torsoHeight *
+      0.35
+    );
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      bodyReference *
+      activeModelConfig.scaleMultiplier,
+
+      0.05,
+
+      1.2
+    );
+
+
+  modelAnchor.position.x =
+    damp(
+      modelAnchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.position.y =
+    damp(
+      modelAnchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.position.z =
+    0;
+
+
+  const smoothScale =
+    damp(
+      modelAnchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  modelAnchor.rotation.y =
+    dampAngle(
+      modelAnchor.rotation.y,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.rotation.z =
+    damp(
+      modelAnchor.rotation.z,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.visible =
+    true;
+
+
+  anchorStatus.textContent =
+    `${activeModelConfig.name} | SHOULDER ${side.toUpperCase()} | scale ${smoothScale.toFixed(3)}`;
+}
 
 /* =========================================================
    BEHAVIOR ROUTER
@@ -3283,9 +3487,16 @@ function updateModelBehavior(
       updateBesideBehavior(
         delta
       );
-
       break;
 
+    case "SHOULDER":
+
+      updateShoulderBehavior(
+        delta
+     );
+    
+      break;
+    
 
     default:
 

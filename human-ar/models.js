@@ -31,7 +31,7 @@ export const MODEL_REGISTRY = [
 
     path: "./models/waveboy.glb",
 
-    behavior: "BESIDE",
+    behavior: "SHOULDER",
 
     scaleMultiplier: 1.35,
 
@@ -43,10 +43,14 @@ export const MODEL_REGISTRY = [
 
     animationIndex: 0,
 
-    beside: {
-        side: "right",
-        distance: 1.05,
-        offsetY: -0.18
+    shoulder: {
+    side: "right",
+
+    // ขยับออกจากไหล่ด้านข้างเล็กน้อย
+    offsetX: 0.32,
+
+    // + = สูงขึ้นบนหน้าจอ
+    offsetY: 0.12
     }
   }
 

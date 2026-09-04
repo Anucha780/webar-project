@@ -1031,6 +1031,156 @@ function initializeThree() {
 
 
 /* =========================================================
+   TORSO TEST OBJECT
+========================================================= */
+
+let torsoTestAnchor =
+  null;
+
+let torsoTestEnabled =
+  true;
+
+
+function createTorsoTestObject() {
+
+  const geometry =
+    new THREE.TorusGeometry(
+      0.5,
+      0.12,
+      16,
+      48
+    );
+
+
+  const material =
+    new THREE.MeshStandardMaterial({
+
+      color:
+        0xffffff,
+
+      metalness:
+        0.15,
+
+      roughness:
+        0.45
+    });
+
+
+  const mesh =
+    new THREE.Mesh(
+      geometry,
+      material
+    );
+
+
+  mesh.rotation.x =
+    Math.PI / 2;
+
+
+  torsoTestAnchor =
+    new THREE.Group();
+
+
+  torsoTestAnchor.visible =
+    false;
+
+
+  torsoTestAnchor.add(
+    mesh
+  );
+
+
+  scene.add(
+    torsoTestAnchor
+  );
+}
+
+function updateTorsoTestObject(
+  delta
+) {
+
+  if (
+    !torsoTestAnchor ||
+    !torsoTestEnabled ||
+    !trackedBody.valid
+  ) {
+
+    if (
+      torsoTestAnchor
+    ) {
+
+      torsoTestAnchor.visible =
+        false;
+    }
+
+    return;
+  }
+
+
+  const targetX =
+    trackedBody.centerX;
+
+
+  const targetY =
+    trackedBody.centerY +
+    trackedBody.torsoHeight *
+    0.15;
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      trackedBody.shoulderWidth *
+      0.7,
+
+      0.05,
+
+      0.5
+    );
+
+
+  torsoTestAnchor.position.x =
+    damp(
+      torsoTestAnchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  torsoTestAnchor.position.y =
+    damp(
+      torsoTestAnchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  torsoTestAnchor.position.z =
+    0.02;
+
+
+  const smoothScale =
+    damp(
+      torsoTestAnchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  torsoTestAnchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  torsoTestAnchor.visible =
+    true;
+}
+
+
+/* =========================================================
    MODEL CONFIG VALIDATION
 ========================================================= */
 
@@ -1066,7 +1216,8 @@ function validateModelConfig(
     ![
       "ORBIT",
       "BESIDE",
-      "SHOULDER"
+      "SHOULDER",
+      "TORSO_ATTACH"
     ].includes(
       config.behavior
     )
@@ -2068,6 +2219,15 @@ function hideAllModels() {
   ) {
 
     instance.anchor.visible =
+      false;
+  }
+
+
+  if (
+    torsoTestAnchor
+  ) {
+
+    torsoTestAnchor.visible =
       false;
   }
 }
@@ -3622,6 +3782,143 @@ function updateShoulderBehavior(
   );
 }
 
+/* =========================================================
+   TORSO ATTACH
+========================================================= */
+
+function updateTorsoAttachBehavior(
+  instance,
+  delta
+) {
+
+  const config =
+    instance.config;
+
+
+  const torsoConfig =
+    config.torso || {};
+
+
+  const offsetX =
+    Number.isFinite(
+      torsoConfig.offsetX
+    )
+      ? torsoConfig.offsetX
+      : 0;
+
+
+  const offsetY =
+    Number.isFinite(
+      torsoConfig.offsetY
+    )
+      ? torsoConfig.offsetY
+      : 0;
+
+
+  const scaleFactor =
+    Number.isFinite(
+      torsoConfig.scaleFactor
+    )
+      ? torsoConfig.scaleFactor
+      : 1;
+
+
+  const targetX =
+    trackedBody.centerX +
+    trackedBody.shoulderWidth *
+    offsetX;
+
+
+  const targetY =
+    trackedBody.centerY +
+    trackedBody.torsoHeight *
+    offsetY;
+
+
+  const bodyReference =
+    trackedBody.shoulderWidth *
+    0.6
+    +
+    trackedBody.torsoHeight *
+    0.4;
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      bodyReference *
+      config.scaleMultiplier *
+      scaleFactor,
+
+      0.04,
+
+      1.2
+    );
+
+
+  instance.anchor.position.x =
+    damp(
+      instance.anchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.y =
+    damp(
+      instance.anchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.z =
+    0;
+
+
+  const smoothScale =
+    damp(
+      instance.anchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  instance.anchor.rotation.y =
+    dampAngle(
+      instance.anchor.rotation.y,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.rotation.z =
+    damp(
+      instance.anchor.rotation.z,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.visible =
+    true;
+
+
+  return (
+    `${config.name} TORSO_ATTACH`
+  );
+}
+
 
 /* =========================================================
    BESIDE
@@ -3858,6 +4155,15 @@ function updateAllModelBehaviors(
 
 
         break;
+
+      case "TORSO_ATTACH":
+
+        debug.push(
+          updateTorsoAttachBehavior(
+            instance,
+            delta
+          )
+        );
 
 
       default:
@@ -4458,6 +4764,10 @@ function predictPose() {
       delta
     );
 
+    updateTorsoTestObject(
+      delta
+    );
+
   } catch (error) {
 
     hideAllModels();
@@ -4683,6 +4993,7 @@ try {
 
   initializeThree();
 
+  createTorsoTestObject();
 
   loadAllModels();
 

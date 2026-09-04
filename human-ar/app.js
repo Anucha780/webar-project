@@ -3336,33 +3336,50 @@ function updateShoulderBehavior(
 
 
   if (
-    side === "left"
-  ) {
+  side === "left"
+) {
 
-    targetX =
-      trackedBody.leftShoulderX -
-      trackedBody.shoulderWidth *
-      offsetX;
+    shoulderX =
+        trackedBody.leftShoulderX;
 
+    shoulderY =
+        trackedBody.leftShoulderY;
 
-    targetY =
-      trackedBody.leftShoulderY +
-      trackedBody.torsoHeight *
-      offsetY;
+    } else {
 
-  } else {
+    shoulderX =
+        trackedBody.rightShoulderX;
 
-    targetX =
-      trackedBody.rightShoulderX +
-      trackedBody.shoulderWidth *
-      offsetX;
+    shoulderY =
+        trackedBody.rightShoulderY;
+    }
 
 
-    targetY =
-      trackedBody.rightShoulderY +
-      trackedBody.torsoHeight *
-      offsetY;
-  }
+/*
+  Determine which direction is OUTSIDE the body.
+
+  This makes SHOULDER behavior work correctly
+  for both mirrored front camera and rear camera.
+*/
+
+const outwardDirection =
+  shoulderX >= trackedBody.centerX
+    ? 1
+    : -1;
+
+
+targetX =
+  shoulderX +
+  outwardDirection *
+  trackedBody.shoulderWidth *
+  offsetX;
+
+
+targetY =
+  shoulderY +
+  trackedBody.torsoHeight *
+  offsetY;
+  
 
 
   const bodyReference =

@@ -1188,6 +1188,150 @@ function updateTorsoTestObject(
     true;
 }
 
+/* =========================================================
+   HEAD TEST OBJECT
+========================================================= */
+
+let headTestAnchor =
+  null;
+
+
+let headTestEnabled =
+  true;
+
+
+function createHeadTestObject() {
+
+  const geometry =
+    new THREE.SphereGeometry(
+      0.22,
+      24,
+      24
+    );
+
+
+  const material =
+    new THREE.MeshStandardMaterial({
+
+      color:
+        0xffffff,
+
+      metalness:
+        0.1,
+
+      roughness:
+        0.5
+    });
+
+
+  const mesh =
+    new THREE.Mesh(
+      geometry,
+      material
+    );
+
+
+  headTestAnchor =
+    new THREE.Group();
+
+
+  headTestAnchor.visible =
+    false;
+
+
+  headTestAnchor.add(
+    mesh
+  );
+
+
+  scene.add(
+    headTestAnchor
+  );
+}
+
+function updateHeadTestObject(
+  delta
+) {
+
+  if (
+    !headTestAnchor ||
+    !headTestEnabled ||
+    !trackedBody.valid
+  ) {
+
+    if (
+      headTestAnchor
+    ) {
+
+      headTestAnchor.visible =
+        false;
+    }
+
+    return;
+  }
+
+
+  const targetX =
+    trackedBody.headX;
+
+
+  const targetY =
+    trackedBody.headY +
+    trackedBody.shoulderWidth *
+    0.55;
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      trackedBody.shoulderWidth *
+      0.55,
+
+      0.04,
+
+      0.35
+    );
+
+
+  headTestAnchor.position.x =
+    damp(
+      headTestAnchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  headTestAnchor.position.y =
+    damp(
+      headTestAnchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  headTestAnchor.position.z =
+    0.03;
+
+
+  const smoothScale =
+    damp(
+      headTestAnchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  headTestAnchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  headTestAnchor.visible =
+    true;
+}
 
 /* =========================================================
    MODEL CONFIG VALIDATION
@@ -2237,6 +2381,14 @@ function hideAllModels() {
   ) {
 
     torsoTestAnchor.visible =
+      false;
+  }
+
+  if (
+    headTestAnchor
+  ) {
+
+    headTestAnchor.visible =
       false;
   }
 }
@@ -4808,6 +4960,10 @@ function predictPose() {
       delta
     );
 
+    updateHeadTestObject(
+      delta
+    );
+
   } catch (error) {
 
     hideAllModels();
@@ -5034,6 +5190,8 @@ try {
   initializeThree();
 
   createTorsoTestObject();
+
+  createHeadTestObject();
 
   loadAllModels();
 

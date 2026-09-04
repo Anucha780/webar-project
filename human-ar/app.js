@@ -599,6 +599,9 @@ const MIN_VISIBILITY =
 
 const LANDMARK = {
 
+  NOSE:
+    0,
+
   LEFT_SHOULDER:
     11,
 
@@ -628,6 +631,12 @@ const trackedBody = {
   centerY:
     0.5,
 
+  headX:
+    0.5,
+
+  headY:
+    0.25,
+     
   shoulderWidth:
     0.2,
 
@@ -2753,6 +2762,12 @@ function updateTrackedBody(
   landmarks
 ) {
 
+  const nose =
+   landmarks[
+     LANDMARK.NOSE
+   ];
+
+
   const leftShoulder =
     landmarks[
       LANDMARK.LEFT_SHOULDER
@@ -2891,6 +2906,17 @@ function updateTrackedBody(
     canvasToThree(
       rs
     );
+  
+  const noseCanvas =
+    landmarkToCanvas(
+     nose
+    );
+
+
+  const noseThree =
+    canvasToThree(
+      noseCanvas
+    );
 
 
   trackedBody.centerX =
@@ -2935,6 +2961,20 @@ function updateTrackedBody(
 
   trackedBody.valid =
     true;
+
+if (
+  landmarkReliable(
+    nose
+  )
+) {
+
+  trackedBody.headX =
+    noseThree.x;
+
+  trackedBody.headY =
+    noseThree.y;
+}
+
 }
 
 

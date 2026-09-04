@@ -11,7 +11,10 @@ import {
 } from "three/addons/loaders/GLTFLoader.js";
 
 import {
-  MODEL_REGISTRY
+  MODEL_REGISTRY,
+  DEFAULT_MODEL_ID,
+  getModelConfig,
+  normalizeModelConfig
 } from "./models.js";
 
 
@@ -1522,11 +1525,19 @@ async function loadAllModels() {
     const instances =
       await Promise.all(
         MODEL_REGISTRY.map(
-          config =>
-            loadModelInstance(
-              config
+            rawConfig => {
+
+                const config =
+                normalizeModelConfig(
+                    rawConfig
+                );
+
+
+                return loadModelInstance(
+                config
+                );
+            }
             )
-        )
       );
 
 

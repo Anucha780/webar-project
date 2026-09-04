@@ -55,6 +55,53 @@ export const MODEL_REGISTRY = [
 
 ];
 
+export function normalizeModelConfig(
+  model
+) {
+
+  return {
+
+    ...model,
+
+    scaleMultiplier:
+      Number.isFinite(
+        model.scaleMultiplier
+      )
+        ? model.scaleMultiplier
+        : 1,
+
+    rotation: {
+
+      x:
+        Number.isFinite(
+          model.rotation?.x
+        )
+          ? model.rotation.x
+          : 0,
+
+      y:
+        Number.isFinite(
+          model.rotation?.y
+        )
+          ? model.rotation.y
+          : 0,
+
+      z:
+        Number.isFinite(
+          model.rotation?.z
+        )
+          ? model.rotation.z
+          : 0
+    },
+
+    animationIndex:
+      Number.isInteger(
+        model.animationIndex
+      )
+        ? model.animationIndex
+        : 0
+  };
+}
 
 export const DEFAULT_MODEL_ID =
   "butterfly";
@@ -64,8 +111,22 @@ export function getModelConfig(
   modelId
 ) {
 
-  return MODEL_REGISTRY.find(
-    model =>
-      model.id === modelId
-  ) || null;
+  const model =
+    MODEL_REGISTRY.find(
+      item =>
+        item.id === modelId
+    );
+
+
+  if (
+    !model
+  ) {
+
+    return null;
+  }
+
+
+  return normalizeModelConfig(
+    model
+  );
 }

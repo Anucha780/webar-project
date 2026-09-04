@@ -223,7 +223,7 @@ const compositeCtx =
 
 
 /* =========================================================
-   CAPTURE CANVAS
+   CAPTURE
 ========================================================= */
 
 const captureCanvas =
@@ -311,19 +311,12 @@ const LANDMARK = {
 
 
 /* =========================================================
-   TRACKING STATE
+   TRACKED BODY
 ========================================================= */
-
-let orbitAngle =
-  0;
-
-let orbitDepth =
-  0;
-
 
 const trackedBody = {
 
-    valid:
+  valid:
     false,
 
   centerX:
@@ -353,6 +346,17 @@ const trackedBody = {
 
 
 /* =========================================================
+   ORBIT STATE
+========================================================= */
+
+let orbitAngle =
+  0;
+
+let orbitDepth =
+  0;
+
+
+/* =========================================================
    DEBUG
 ========================================================= */
 
@@ -362,7 +366,6 @@ function setStatus(
 
   statusElement.textContent =
     message;
-
 
   console.log(
     `[Human AR] ${message}`
@@ -385,7 +388,6 @@ function setError(
     "[Human AR Error]",
     error
   );
-
 
   errorStatus.textContent =
     `${error.name}: ${error.message}`;
@@ -437,7 +439,7 @@ function initializeModelSelector() {
 
 
 /* =========================================================
-   DAMP
+   DAMPING
 ========================================================= */
 
 function damp(
@@ -652,11 +654,9 @@ function initializeThree() {
     threeStatus.textContent =
       "Failed";
 
-
     setError(
       error
     );
-
 
     throw error;
   }
@@ -761,8 +761,14 @@ function disposeLoadedModel() {
   activeAction =
     null;
 
-  modelAnchor.visible =
-    false;
+
+  if (
+    modelAnchor
+  ) {
+
+    modelAnchor.visible =
+      false;
+  }
 }
 
 
@@ -1159,8 +1165,7 @@ function validateAndAttachModel(
 
 
   loadedModel.scale.setScalar(
-    1 /
-    maxDimension
+    1 / maxDimension
   );
 
 
@@ -1687,7 +1692,7 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP / SWITCH
+   STOP / SWITCH CAMERA
 ========================================================= */
 
 function stopStream() {
@@ -1831,7 +1836,7 @@ async function switchCamera() {
 
 
 /* =========================================================
-   MODEL SWITCHING
+   MODEL SWITCH
 ========================================================= */
 
 function changeModel(
@@ -1839,8 +1844,7 @@ function changeModel(
 ) {
 
   if (
-    modelId ===
-    activeModelId &&
+    modelId === activeModelId &&
     loadedModel
   ) {
 
@@ -1904,15 +1908,13 @@ function resizeOverlay() {
 
   overlay.width =
     Math.round(
-      rect.width *
-      dpr
+      rect.width * dpr
     );
 
 
   overlay.height =
     Math.round(
-      rect.height *
-      dpr
+      rect.height * dpr
     );
 
 
@@ -1993,7 +1995,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT-FIT COVER
+   OBJECT FIT COVER
 ========================================================= */
 
 function getCoverTransform() {
@@ -2162,7 +2164,7 @@ function canvasToThree(
 
 
 /* =========================================================
-   UTILITY
+   UTILITIES
 ========================================================= */
 
 function distance2D(
@@ -2200,8 +2202,7 @@ function landmarkReliable(
 
 
   if (
-    landmark.visibility ===
-    undefined
+    landmark.visibility === undefined
   ) {
 
     return true;
@@ -2395,6 +2396,18 @@ function updateTrackedBody(
     );
 
 
+  const leftShoulderThree =
+    canvasToThree(
+      ls
+    );
+
+
+  const rightShoulderThree =
+    canvasToThree(
+      rs
+    );
+
+
   trackedBody.centerX =
     torsoThree.x;
 
@@ -2417,32 +2430,23 @@ function updateTrackedBody(
       hipCenter
     ) /
     overlay.height;
-  const leftShoulderThree =
-  canvasToThree(
-    ls
-  );
 
 
-const rightShoulderThree =
-  canvasToThree(
-    rs
-  );
+  trackedBody.leftShoulderX =
+    leftShoulderThree.x;
 
 
-trackedBody.leftShoulderX =
-  leftShoulderThree.x;
+  trackedBody.leftShoulderY =
+    leftShoulderThree.y;
 
 
-trackedBody.leftShoulderY =
-  leftShoulderThree.y;
+  trackedBody.rightShoulderX =
+    rightShoulderThree.x;
 
 
-trackedBody.rightShoulderX =
-  rightShoulderThree.x;
+  trackedBody.rightShoulderY =
+    rightShoulderThree.y;
 
-
-trackedBody.rightShoulderY =
-  rightShoulderThree.y;
 
   trackedBody.valid =
     true;
@@ -2521,7 +2525,6 @@ function handleSegmentationResult(
 
       segmentationMaskReady =
         false;
-
 
       return;
     }
@@ -2625,21 +2628,17 @@ function handleSegmentationResult(
 
           confidence
 
-        ) *
-        255;
+        ) * 255;
 
 
       rgba[targetIndex] =
         255;
 
-
       rgba[targetIndex + 1] =
         255;
 
-
       rgba[targetIndex + 2] =
         255;
-
 
       rgba[targetIndex + 3] =
         alpha;
@@ -2668,8 +2667,7 @@ function handleSegmentationResult(
 
 
     if (
-      typeof mask.close ===
-      "function"
+      typeof mask.close === "function"
     ) {
 
       mask.close();
@@ -2853,15 +2851,6 @@ function shouldUseHumanOcclusion() {
   }
 
 
-  /*
-    ORBIT:
-    occlude only on the BACK half.
-
-    BESIDE:
-    character stays outside torso,
-    so human occlusion is not required.
-  */
-
   if (
     activeModelConfig.behavior ===
     "ORBIT"
@@ -2918,7 +2907,6 @@ function updateOrbitBehavior(
 
     modelAnchor.visible =
       false;
-
 
     return;
   }
@@ -3134,15 +3122,9 @@ function updateBesideBehavior(
     modelAnchor.visible =
       false;
 
-
     return;
   }
 
-
-  /*
-    Reset orbit depth because BESIDE
-    does not use fake front/back orbit.
-  */
 
   orbitDepth =
     0;
@@ -3245,10 +3227,6 @@ function updateBesideBehavior(
   );
 
 
-  /*
-    Waveboy stays upright.
-  */
-
   modelAnchor.rotation.y =
     dampAngle(
       modelAnchor.rotation.y,
@@ -3281,6 +3259,7 @@ function updateBesideBehavior(
     `${activeModelConfig.name} | BESIDE ${sideLabel} | scale ${smoothScale.toFixed(3)}`;
 }
 
+
 /* =========================================================
    SHOULDER BEHAVIOR
 ========================================================= */
@@ -3309,7 +3288,7 @@ function updateShoulderBehavior(
     activeModelConfig.shoulder || {};
 
 
-  const side =
+  const requestedSide =
     shoulder.side === "left"
       ? "left"
       : "right";
@@ -3320,7 +3299,7 @@ function updateShoulderBehavior(
       shoulder.offsetX
     )
       ? shoulder.offsetX
-      : 0.3;
+      : 0.55;
 
 
   const offsetY =
@@ -3328,58 +3307,85 @@ function updateShoulderBehavior(
       shoulder.offsetY
     )
       ? shoulder.offsetY
-      : 0.1;
+      : 0.25;
 
 
-  let targetX;
-  let targetY;
+  /*
+    IMPORTANT
+
+    Do NOT depend on MediaPipe anatomical LEFT/RIGHT here.
+
+    We already transformed landmarks into the actual
+    displayed screen coordinates, including front-camera
+    mirroring.
+
+    Therefore we simply find which shoulder is visually
+    left/right on the current screen.
+  */
 
 
-  if (
-  side === "left"
-) {
+  const leftScreenShoulder = {
 
-    shoulderX =
-        trackedBody.leftShoulderX;
+    x:
+      Math.min(
+        trackedBody.leftShoulderX,
+        trackedBody.rightShoulderX
+      ),
 
-    shoulderY =
-        trackedBody.leftShoulderY;
-
-    } else {
-
-    shoulderX =
-        trackedBody.rightShoulderX;
-
-    shoulderY =
-        trackedBody.rightShoulderY;
-    }
+    y:
+      trackedBody.leftShoulderX <
+      trackedBody.rightShoulderX
+        ? trackedBody.leftShoulderY
+        : trackedBody.rightShoulderY
+  };
 
 
-/*
-  Determine which direction is OUTSIDE the body.
+  const rightScreenShoulder = {
 
-  This makes SHOULDER behavior work correctly
-  for both mirrored front camera and rear camera.
-*/
+    x:
+      Math.max(
+        trackedBody.leftShoulderX,
+        trackedBody.rightShoulderX
+      ),
 
-const outwardDirection =
-  shoulderX >= trackedBody.centerX
-    ? 1
-    : -1;
-
-
-targetX =
-  shoulderX +
-  outwardDirection *
-  trackedBody.shoulderWidth *
-  offsetX;
+    y:
+      trackedBody.leftShoulderX >
+      trackedBody.rightShoulderX
+        ? trackedBody.leftShoulderY
+        : trackedBody.rightShoulderY
+  };
 
 
-targetY =
-  shoulderY +
-  trackedBody.torsoHeight *
-  offsetY;
-  
+  const selectedShoulder =
+    requestedSide === "left"
+      ? leftScreenShoulder
+      : rightScreenShoulder;
+
+
+  /*
+    Push OUTSIDE the body.
+
+    Screen-left shoulder  -> negative X
+    Screen-right shoulder -> positive X
+  */
+
+  const outwardDirection =
+    requestedSide === "left"
+      ? -1
+      : 1;
+
+
+  const targetX =
+    selectedShoulder.x +
+    outwardDirection *
+    trackedBody.shoulderWidth *
+    offsetX;
+
+
+  const targetY =
+    selectedShoulder.y +
+    trackedBody.torsoHeight *
+    offsetY;
 
 
   const bodyReference =
@@ -3463,8 +3469,9 @@ targetY =
 
 
   anchorStatus.textContent =
-    `${activeModelConfig.name} | SHOULDER ${side.toUpperCase()} | scale ${smoothScale.toFixed(3)}`;
+    `${activeModelConfig.name} | SHOULDER ${requestedSide.toUpperCase()} | scale ${smoothScale.toFixed(3)}`;
 }
+
 
 /* =========================================================
    BEHAVIOR ROUTER
@@ -3480,7 +3487,6 @@ function updateModelBehavior(
 
     modelAnchor.visible =
       false;
-
 
     return;
   }
@@ -3504,16 +3510,18 @@ function updateModelBehavior(
       updateBesideBehavior(
         delta
       );
+
       break;
+
 
     case "SHOULDER":
 
       updateShoulderBehavior(
         delta
-     );
-    
+      );
+
       break;
-    
+
 
     default:
 
@@ -3528,7 +3536,7 @@ function updateModelBehavior(
 
 
 /* =========================================================
-   DEBUG POSE
+   POSE DEBUG
 ========================================================= */
 
 function drawLine(
@@ -3714,7 +3722,7 @@ function drawOverlay() {
 
 
 /* =========================================================
-   CAPTURE
+   CAPTURE PHOTO
 ========================================================= */
 
 async function capturePhoto() {
@@ -3727,7 +3735,6 @@ async function capturePhoto() {
 
     captureStatus.textContent =
       "Camera not ready";
-
 
     return;
   }
@@ -3971,8 +3978,7 @@ function predictPose() {
 
   if (
     video.readyState >= 2 &&
-    video.currentTime !==
-    lastVideoTime
+    video.currentTime !== lastVideoTime
   ) {
 
     lastVideoTime =
@@ -4148,7 +4154,7 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 8.3 initialized"
+  "[Human AR] Milestone 8.5 initialized"
 );
 
 

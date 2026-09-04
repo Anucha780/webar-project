@@ -33,7 +33,7 @@ export const MODEL_REGISTRY = [
 
     behavior: "SHOULDER",
 
-    scaleMultiplier: 1.20,
+    scaleMultiplier: 1.05,
 
     rotation: {
       x: 0,
@@ -45,12 +45,8 @@ export const MODEL_REGISTRY = [
 
     shoulder: {
   side: "right",
-
-  // ดันออกจากลำตัวมากขึ้น
-  offsetX: 0.85,
-
-  // ยกขึ้นเหนือระดับอก เข้าใกล้แนวไหล่มากขึ้น
-  offsetY: 0.32
+  offsetX: 0.55,
+  offsetY: 0.25
 }
   }
 

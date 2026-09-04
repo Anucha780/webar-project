@@ -8,7 +8,6 @@ export const MODEL_REGISTRY = [
 
   {
     id: "butterfly",
-
     name: "Butterfly",
 
     path: "./models/test-model.glb",
@@ -26,10 +25,8 @@ export const MODEL_REGISTRY = [
     animationIndex: 0
   },
 
-
   {
     id: "waveboy",
-
     name: "Waveboy",
 
     path: "./models/waveboy.glb",
@@ -47,44 +44,23 @@ export const MODEL_REGISTRY = [
     animationIndex: 0,
 
     beside: {
-
-      /*
-        "right" = ด้านขวาบนหน้าจอ
-      */
-
       side: "right",
-
-      /*
-        ระยะห่างจากกลางลำตัว
-        คูณด้วย shoulder width
-      */
-
-      distance: 1.20,
-
-      /*
-        ปรับสูง/ต่ำ
-        อิง torso height
-      */
-
-      offsetY: -0.10
+      distance: 1.2,
+      offsetY: -0.1
     }
   }
 
 ];
 
 
-export const DEFAULT_MODEL_ID =
-  "butterfly";
+export const DEFAULT_MODEL_ID = "butterfly";
 
 
-export function getModelConfig(
-  modelId
-) {
+export function getModelConfig(modelId) {
 
   return (
     MODEL_REGISTRY.find(
-      model =>
-        model.id === modelId
+      model => model.id === modelId
     ) || null
   );
 }

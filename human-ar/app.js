@@ -166,21 +166,9 @@ let allModelsReady =
 
 
 const enabledEffects = {
-
-  butterfly:
-    true,
-
-  waveboy:
-    true,
-
-  stars:
-    true,
-
-  headtest: 
-    true,  
-
-  torsotest: 
-    true
+  butterfly: true,
+  waveboy: true,
+  stars: true
 };
 
 /* =========================================================
@@ -1049,295 +1037,13 @@ function initializeThree() {
    TORSO TEST OBJECT
 ========================================================= */
 
-let torsoTestAnchor =
-  null;
 
-let torsoTestEnabled =
-  true;
-
-
-function createTorsoTestObject() {
-
-  const geometry =
-    new THREE.TorusGeometry(
-      0.5,
-      0.12,
-      16,
-      48
-    );
-
-
-  const material =
-    new THREE.MeshStandardMaterial({
-
-      color:
-        0xffffff,
-
-      metalness:
-        0.15,
-
-      roughness:
-        0.45
-    });
-
-
-  const mesh =
-    new THREE.Mesh(
-      geometry,
-      material
-    );
-
-
-  mesh.rotation.x =
-    Math.PI / 2;
-
-
-  torsoTestAnchor =
-    new THREE.Group();
-
-
-  torsoTestAnchor.visible =
-    false;
-
-
-  torsoTestAnchor.add(
-    mesh
-  );
-
-
-  scene.add(
-    torsoTestAnchor
-  );
-}
-
-function updateTorsoTestObject(
-  delta
-) {
-
-  if (
-    !torsoTestAnchor ||
-    !torsoTestEnabled ||
-    !trackedBody.valid
-  ) {
-
-    if (
-      torsoTestAnchor
-    ) {
-
-      torsoTestAnchor.visible =
-        false;
-    }
-
-    return;
-  }
-
-
-  const targetX =
-    trackedBody.centerX;
-
-
-  const targetY =
-    trackedBody.centerY +
-    trackedBody.torsoHeight *
-    0.15;
-
-
-  const targetScale =
-    THREE.MathUtils.clamp(
-
-      trackedBody.shoulderWidth *
-      0.7,
-
-      0.05,
-
-      0.5
-    );
-
-
-  torsoTestAnchor.position.x =
-    damp(
-      torsoTestAnchor.position.x,
-      targetX,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-
-  torsoTestAnchor.position.y =
-    damp(
-      torsoTestAnchor.position.y,
-      targetY,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-
-  torsoTestAnchor.position.z =
-    0.02;
-
-
-  const smoothScale =
-    damp(
-      torsoTestAnchor.scale.x,
-      targetScale,
-      SCALE_SMOOTHING,
-      delta
-    );
-
-
-  torsoTestAnchor.scale.setScalar(
-    smoothScale
-  );
-
-
-  torsoTestAnchor.visible =
-    true;
-}
 
 /* =========================================================
    HEAD TEST OBJECT
 ========================================================= */
 
-let headTestAnchor =
-  null;
 
-
-let headTestEnabled =
-  true;
-
-
-function createHeadTestObject() {
-
-  const geometry =
-    new THREE.SphereGeometry(
-      0.22,
-      24,
-      24
-    );
-
-
-  const material =
-    new THREE.MeshStandardMaterial({
-
-      color:
-        0xffffff,
-
-      metalness:
-        0.1,
-
-      roughness:
-        0.5
-    });
-
-
-  const mesh =
-    new THREE.Mesh(
-      geometry,
-      material
-    );
-
-
-  headTestAnchor =
-    new THREE.Group();
-
-
-  headTestAnchor.visible =
-    false;
-
-
-  headTestAnchor.add(
-    mesh
-  );
-
-
-  scene.add(
-    headTestAnchor
-  );
-}
-
-function updateHeadTestObject(
-  delta
-) {
-
-  if (
-    !headTestAnchor ||
-    !headTestEnabled ||
-    !trackedBody.valid
-  ) {
-
-    if (
-      headTestAnchor
-    ) {
-
-      headTestAnchor.visible =
-        false;
-    }
-
-    return;
-  }
-
-
-  const targetX =
-    trackedBody.headX;
-
-
-  const targetY =
-    trackedBody.headY +
-    trackedBody.shoulderWidth *
-    0.55;
-
-  
-  const targetScale =
-    THREE.MathUtils.clamp(
-
-      trackedBody.shoulderWidth *
-      0.55,
-
-      0.04,
-
-      0.35
-    );
-
-
-  headTestAnchor.position.x =
-    damp(
-      headTestAnchor.position.x,
-      targetX,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-
-  headTestAnchor.position.y =
-    damp(
-      headTestAnchor.position.y,
-      targetY,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-
-  headTestAnchor.position.z =
-    0.03;
-
-
-  const smoothScale =
-    damp(
-      headTestAnchor.scale.x,
-      targetScale,
-      SCALE_SMOOTHING,
-      delta
-    );
-
-
-  headTestAnchor.scale.setScalar(
-    smoothScale
-  );
-
-
-  headTestAnchor.visible =
-    true;
-}
 
 /* =========================================================
    MODEL CONFIG VALIDATION
@@ -2379,23 +2085,6 @@ function hideAllModels() {
   ) {
 
     instance.anchor.visible =
-      false;
-  }
-
-
-  if (
-    torsoTestAnchor
-  ) {
-
-    torsoTestAnchor.visible =
-      false;
-  }
-
-  if (
-    headTestAnchor
-  ) {
-
-    headTestAnchor.visible =
       false;
   }
 }
@@ -5099,13 +4788,6 @@ function predictPose() {
       delta
     );
 
-    updateTorsoTestObject(
-      delta
-    );
-
-    updateHeadTestObject(
-      delta
-    );
 
   } catch (error) {
 
@@ -5331,10 +5013,6 @@ updateEffectDebug();
 try {
 
   initializeThree();
-
-  createTorsoTestObject();
-
-  createHeadTestObject();
 
   loadAllModels();
 

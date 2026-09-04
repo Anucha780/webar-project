@@ -15,6 +15,8 @@ export const MODEL_REGISTRY = [
 
     behavior: "ORBIT",
 
+    enabled: true,
+
     scaleMultiplier: 1.35,
 
     rotation: {
@@ -35,6 +37,8 @@ export const MODEL_REGISTRY = [
     path: "./models/waveboy.glb",
 
     behavior: "SHOULDER",
+
+    enabled: true,
 
     scaleMultiplier: 1.05,
 
@@ -62,6 +66,9 @@ export function normalizeModelConfig(
   return {
 
     ...model,
+
+    enabled:
+      model.enabled !== false,
 
     scaleMultiplier:
       Number.isFinite(

@@ -1279,8 +1279,32 @@ function updateHeadTestObject(
     trackedBody.headY +
     trackedBody.shoulderWidth *
     0.55;
+  
+  console.log(
+  "HEAD TEST:",
+  {
+    headX:
+      trackedBody.headX,
 
+    headY:
+      trackedBody.headY,
 
+    targetX:
+      targetX,
+
+    targetY:
+      targetY,
+
+    shoulderWidth:
+      trackedBody.shoulderWidth,
+
+    anchorExists:
+      Boolean(
+        headTestAnchor
+      )
+  }
+);  
+  
   const targetScale =
     THREE.MathUtils.clamp(
 
@@ -3110,15 +3134,11 @@ function updateTrackedBody(
   trackedBody.rightShoulderY =
     rightShoulderThree.y;
 
-
-  trackedBody.valid =
-    true;
-
-if (
-  landmarkReliable(
-    nose
-  )
-) {
+  if (
+    landmarkReliable(
+      nose
+   )
+  ) {
 
   trackedBody.headX =
     noseThree.x;
@@ -3126,6 +3146,8 @@ if (
   trackedBody.headY =
     noseThree.y;
 }
+  trackedBody.valid =
+    true;
 
 }
 

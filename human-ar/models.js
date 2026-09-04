@@ -33,7 +33,7 @@ export const MODEL_REGISTRY = [
 
     behavior: "SHOULDER",
 
-    scaleMultiplier: 1.35,
+    scaleMultiplier: 1.20,
 
     rotation: {
       x: 0,
@@ -44,14 +44,14 @@ export const MODEL_REGISTRY = [
     animationIndex: 0,
 
     shoulder: {
-    side: "right",
+  side: "right",
 
-    // ขยับออกจากไหล่ด้านข้างเล็กน้อย
-    offsetX: 0.32,
+  // ดันออกจากลำตัวมากขึ้น
+  offsetX: 0.85,
 
-    // + = สูงขึ้นบนหน้าจอ
-    offsetY: 0.12
-    }
+  // ยกขึ้นเหนือระดับอก เข้าใกล้แนวไหล่มากขึ้น
+  offsetY: 0.32
+}
   }
 
 ];

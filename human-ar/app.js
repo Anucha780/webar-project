@@ -824,6 +824,14 @@ function getCaptureEffectName() {
     );
   }
 
+  if (
+  enabledEffects.stars
+) {
+
+  names.push(
+    "stars"
+  );
+}
 
   if (
     names.length === 0
@@ -4160,6 +4168,9 @@ async function capturePhoto() {
       true
     );
 
+    drawStarsEffect(
+      performance.now()
+    );
 
     renderer.render(
       scene,
@@ -4175,6 +4186,22 @@ async function capturePhoto() {
       captureCanvas.height
     );
 
+    captureCtx.drawImage(
+      effectOverlay,
+      0,
+      0,
+      captureCanvas.width,
+      captureCanvas.height
+    );
+
+
+    captureCtx.drawImage(
+      effectOverlay,
+      0,
+      0,
+      captureCanvas.width,
+      captureCanvas.height
+    );
 
     if (
       shouldUseHumanOcclusion() &&

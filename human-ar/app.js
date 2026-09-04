@@ -746,52 +746,51 @@ function updateEffectDebug() {
   const behaviors =
     [];
 
-
-  if (
-    enabledEffects.butterfly
+  for (
+    const rawConfig
+    of MODEL_REGISTRY
   ) {
 
+    const config =
+      normalizeModelConfig(
+        rawConfig
+      );
+
+    if (
+      !effectIsEnabled(
+        config.id
+      )
+    ) {
+
+      continue;
+    }
+
     names.push(
-      "Butterfly"
+      config.name
     );
 
     behaviors.push(
-      "ORBIT"
+      config.behavior
     );
   }
 
-
   if (
-    enabledEffects.waveboy
+    enabledEffects.stars
   ) {
 
     names.push(
-      "Waveboy"
+      "Stars"
     );
 
     behaviors.push(
-      "SHOULDER"
+      "BODY_EFFECT"
     );
   }
-
-  if (
-  enabledEffects.stars
-) {
-
-  names.push(
-    "Stars"
-  );
-
-  behaviors.push(
-    "BODY_EFFECT"
-  );
-}
 
   activeModelStatus.textContent =
     names.length > 0
       ? names.join(" + ")
       : "None";
-
 
   behaviorStatus.textContent =
     behaviors.length > 0

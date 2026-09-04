@@ -174,7 +174,10 @@ const enabledEffects = {
     true,
 
   stars:
-    true
+    true,
+
+  headtest: 
+    true  
 };
 
 /* =========================================================
@@ -1279,31 +1282,7 @@ function updateHeadTestObject(
     trackedBody.headY +
     trackedBody.shoulderWidth *
     0.55;
-  
-  console.log(
-  "HEAD TEST:",
-  {
-    headX:
-      trackedBody.headX,
 
-    headY:
-      trackedBody.headY,
-
-    targetX:
-      targetX,
-
-    targetY:
-      targetY,
-
-    shoulderWidth:
-      trackedBody.shoulderWidth,
-
-    anchorExists:
-      Boolean(
-        headTestAnchor
-      )
-  }
-);  
   
   const targetScale =
     THREE.MathUtils.clamp(
@@ -1394,7 +1373,8 @@ function validateModelConfig(
       "ORBIT",
       "BESIDE",
       "SHOULDER",
-      "TORSO_ATTACH"
+      "TORSO_ATTACH",
+      "HEAD_ATTACH"
     ].includes(
       config.behavior
     )
@@ -4133,6 +4113,135 @@ function updateTorsoAttachBehavior(
   );
 }
 
+/* =========================================================
+   HEAD ATTACH
+========================================================= */
+
+function updateHeadAttachBehavior(
+  instance,
+  delta
+) {
+
+  const config =
+    instance.config;
+
+
+  const headConfig =
+    config.head || {};
+
+
+  const offsetX =
+    Number.isFinite(
+      headConfig.offsetX
+    )
+      ? headConfig.offsetX
+      : 0;
+
+
+  const offsetY =
+    Number.isFinite(
+      headConfig.offsetY
+    )
+      ? headConfig.offsetY
+      : 0.55;
+
+
+  const scaleFactor =
+    Number.isFinite(
+      headConfig.scaleFactor
+    )
+      ? headConfig.scaleFactor
+      : 1;
+
+
+  const targetX =
+    trackedBody.headX +
+    trackedBody.shoulderWidth *
+    offsetX;
+
+
+  const targetY =
+    trackedBody.headY +
+    trackedBody.shoulderWidth *
+    offsetY;
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      trackedBody.shoulderWidth *
+      config.scaleMultiplier *
+      scaleFactor,
+
+      0.04,
+
+      0.8
+    );
+
+
+  instance.anchor.position.x =
+    damp(
+      instance.anchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.y =
+    damp(
+      instance.anchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.z =
+    0.03;
+
+
+  const smoothScale =
+    damp(
+      instance.anchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  instance.anchor.rotation.y =
+    dampAngle(
+      instance.anchor.rotation.y,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.rotation.z =
+    damp(
+      instance.anchor.rotation.z,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.visible =
+    true;
+
+
+  return (
+    `${config.name} HEAD_ATTACH`
+  );
+}
+
 
 /* =========================================================
    BESIDE
@@ -4378,7 +4487,16 @@ function updateAllModelBehaviors(
             delta
           )
         );
+      case "HEAD_ATTACH":
 
+        debug.push(
+            updateHeadAttachBehavior(
+            instance,
+            delta
+    )
+  );
+
+  break;
 
       default:
 

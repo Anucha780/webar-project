@@ -47,11 +47,36 @@ const placeholder =
   document.querySelector("#camera-placeholder");
 
 
-const butterflyToggle =
-  document.querySelector("#toggle-butterfly");
+const modelToggleElements =
+  new Map();
 
-const waveboyToggle =
-  document.querySelector("#toggle-waveboy");
+
+for (
+  const rawConfig
+  of MODEL_REGISTRY
+) {
+
+  const config =
+    normalizeModelConfig(
+      rawConfig
+    );
+
+  const toggleElement =
+    document.querySelector(
+      `#toggle-${config.id}`
+    );
+
+
+  if (
+    toggleElement
+  ) {
+
+    modelToggleElements.set(
+      config.id,
+      toggleElement
+    );
+  }
+}
 
 
 const startButton =
@@ -824,34 +849,38 @@ function getCaptureEffectName() {
   const names =
     [];
 
-
-  if (
-    enabledEffects.butterfly
+  for (
+    const rawConfig
+    of MODEL_REGISTRY
   ) {
 
-    names.push(
-      "butterfly"
-    );
+    const config =
+      normalizeModelConfig(
+        rawConfig
+      );
+
+    if (
+      effectIsEnabled(
+        config.id
+      )
+    ) {
+
+      names.push(
+        config.id
+      );
+    }
   }
 
 
   if (
-    enabledEffects.waveboy
+    enabledEffects.stars
   ) {
 
     names.push(
-      "waveboy"
+      "stars"
     );
   }
 
-  if (
-  enabledEffects.stars
-) {
-
-  names.push(
-    "stars"
-  );
-}
 
   if (
     names.length === 0
@@ -1758,15 +1787,37 @@ function updateControls() {
     cameraRunning;
 
 
-  butterflyToggle.disabled =
-    !allModelsReady;
+  for (
+    const rawConfig
+    of MODEL_REGISTRY
+  ) {
+
+    const config =
+      normalizeModelConfig(
+        rawConfig
+      );
+
+    const toggleElement =
+      document.querySelector(
+        `#toggle-${config.id}`
+      );
+
+    if (
+      !toggleElement
+    ) {
+
+      continue;
+    }
 
 
-  waveboyToggle.disabled =
-    !allModelsReady;
+    toggleElement.disabled =
+      !allModelsReady;
+  }
+
 
   starsToggle.disabled =
     !allModelsReady;
+
 
   switchButton.disabled =
     !cameraRunning;
@@ -4848,6 +4899,53 @@ function predictPose() {
     );
 }
 
+function handleModelToggle(
+  modelId,
+  toggleElement
+) {
+
+  const config =
+    getModelConfig(
+      modelId
+    );
+
+  if (
+    !config
+  ) {
+
+    setError(
+      new Error(
+        `Unknown model: ${modelId}`
+      )
+    );
+
+    return;
+  }
+
+
+  enabledEffects[
+    config.id
+  ] =
+    toggleElement.checked;
+
+
+  updateEffectVisibility();
+
+
+  updateEffectDebug();
+
+
+  clearError();
+
+
+  setStatus(
+    effectIsEnabled(
+      config.id
+    )
+      ? `${config.name} enabled`
+      : `${config.name} disabled`
+  );
+}
 
 /* =========================================================
    EVENTS
@@ -4877,56 +4975,50 @@ stopButton.addEventListener(
 );
 
 
-butterflyToggle.addEventListener(
-  "change",
-  () => {
+for (
+  const rawConfig
+  of MODEL_REGISTRY
+) {
 
-    enabledEffects.butterfly =
-      butterflyToggle.checked;
-
-
-    updateEffectVisibility();
-
-
-    updateEffectDebug();
-
-
-    clearError();
-
-
-    setStatus(
-      enabledEffects.butterfly
-        ? "Butterfly enabled"
-        : "Butterfly disabled"
+  const config =
+    normalizeModelConfig(
+      rawConfig
     );
+
+
+  if (
+    !config.toggleable
+  ) {
+
+    continue;
   }
-);
 
 
-waveboyToggle.addEventListener(
-  "change",
-  () => {
-
-    enabledEffects.waveboy =
-      waveboyToggle.checked;
-
-
-    updateEffectVisibility();
-
-
-    updateEffectDebug();
-
-
-    clearError();
-
-
-    setStatus(
-      enabledEffects.waveboy
-        ? "Waveboy enabled"
-        : "Waveboy disabled"
+  const toggleElement =
+    modelToggleElements.get(
+      config.id
     );
+
+
+  if (
+    !toggleElement
+  ) {
+
+    continue;
   }
-);
+
+
+  toggleElement.addEventListener(
+    "change",
+    () => {
+
+      handleModelToggle(
+        config.id,
+        toggleElement
+      );
+    }
+  );
+}
 
 starsToggle.addEventListener(
   "change",
@@ -5012,22 +5104,41 @@ stopButton.disabled =
   true;
 
 
-butterflyToggle.disabled =
-  true;
+for (
+  const rawConfig
+  of MODEL_REGISTRY
+) {
+
+  const config =
+    normalizeModelConfig(
+      rawConfig
+    );
+
+  const toggleElement =
+    document.querySelector(
+      `#toggle-${config.id}`
+    );
+
+  if (
+    !toggleElement
+  ) {
+
+    continue;
+  }
 
 
-waveboyToggle.disabled =
-  true;
+  toggleElement.disabled =
+    true;
+
+
+  toggleElement.checked =
+    effectIsEnabled(
+      config.id
+    );
+}
 
 starsToggle.disabled =
-  true;
-
-butterflyToggle.checked =
-  enabledEffects.butterfly;
-
-
-waveboyToggle.checked =
-  enabledEffects.waveboy;
+  true;  
 
 starsToggle.checked =
   enabledEffects.stars;

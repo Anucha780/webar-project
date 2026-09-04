@@ -7,55 +7,73 @@
 export const MODEL_REGISTRY = [
 
   {
-    id: "butterfly",
+  id: "butterfly",
 
-    name: "Butterfly",
+  name: "Butterfly",
 
-    path: "./models/test-model.glb",
+  type: "GLB",
 
-    behavior: "ORBIT",
+  path: "./models/test-model.glb",
 
-    enabled: true,
+  behavior: "ORBIT",
 
-    scaleMultiplier: 1.35,
+  enabled: true,
 
-    rotation: {
-      x: 0,
-      y: 0,
-      z: 0
-    },
+  toggleable: true,
 
-    animationIndex: 0
+  ui: {
+    label: "Butterfly",
+    order: 1
   },
+
+  scaleMultiplier: 1.35,
+
+  rotation: {
+    x: 0,
+    y: 0,
+    z: 0
+  },
+
+  animationIndex: 0
+},
 
 
   {
-    id: "waveboy",
+  id: "waveboy",
 
-    name: "Waveboy",
+  name: "Waveboy",
 
-    path: "./models/waveboy.glb",
+  type: "GLB",
 
-    behavior: "SHOULDER",
+  path: "./models/waveboy.glb",
 
-    enabled: true,
+  behavior: "SHOULDER",
 
-    scaleMultiplier: 1.05,
+  enabled: true,
 
-    rotation: {
-      x: 0,
-      y: 0,
-      z: 0
-    },
+  toggleable: true,
 
-    animationIndex: 0,
+  ui: {
+    label: "Waveboy",
+    order: 2
+  },
 
-    shoulder: {
-      side: "right",
-      offsetX: 0.55,
-      offsetY: 0.25
-    }
+  scaleMultiplier: 1.05,
+
+  rotation: {
+    x: 0,
+    y: 0,
+    z: 0
+  },
+
+  animationIndex: 0,
+
+  shoulder: {
+    side: "right",
+    offsetX: 0.55,
+    offsetY: 0.25
   }
+}
 
 ];
 
@@ -66,6 +84,28 @@ export function normalizeModelConfig(
   return {
 
     ...model,
+
+     type:
+    model.type || "GLB",
+
+  toggleable:
+    model.toggleable !== false,
+
+  ui: {
+    label:
+      model.ui?.label ||
+      model.name ||
+      model.id,
+
+    order:
+      Number.isFinite(
+        model.ui?.order
+      )
+        ? model.ui.order
+        : 999
+  },
+
+
 
     enabled:
       model.enabled !== false,

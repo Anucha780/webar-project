@@ -34,8 +34,13 @@ const ctx =
 const placeholder =
   document.querySelector("#camera-placeholder");
 
-const modelSelector =
-  document.querySelector("#model-selector");
+
+const butterflyToggle =
+  document.querySelector("#toggle-butterfly");
+
+const waveboyToggle =
+  document.querySelector("#toggle-waveboy");
+
 
 const startButton =
   document.querySelector("#start-camera");
@@ -109,7 +114,7 @@ const errorStatus =
 
 
 /* =========================================================
-   CAMERA / MEDIAPIPE STATE
+   CAMERA / MEDIAPIPE
 ========================================================= */
 
 let stream =
@@ -141,7 +146,7 @@ let latestLandmarks =
 
 
 /* =========================================================
-   MULTI MODEL STATE
+   MULTI MODEL
 ========================================================= */
 
 const modelInstances =
@@ -151,20 +156,18 @@ let allModelsReady =
   false;
 
 
-/*
-  Modes shown in the existing selector.
+const enabledEffects = {
 
-  both        = Butterfly + Waveboy
-  butterfly   = Butterfly only
-  waveboy     = Waveboy only
-*/
+  butterfly:
+    true,
 
-let sceneMode =
-  "both";
+  waveboy:
+    true
+};
 
 
 /* =========================================================
-   SEGMENTATION STATE
+   SEGMENTATION
 ========================================================= */
 
 let segmentationBusy =
@@ -207,7 +210,8 @@ const maskCtx =
   maskCanvas.getContext(
     "2d",
     {
-      willReadFrequently: true
+      willReadFrequently:
+        true
     }
   );
 
@@ -241,7 +245,7 @@ let renderer =
 
 
 /* =========================================================
-   ORBIT
+   ORBIT SETTINGS
 ========================================================= */
 
 const ORBIT_SPEED =
@@ -288,7 +292,7 @@ const MIN_VISIBILITY =
 
 
 /* =========================================================
-   LANDMARKS
+   LANDMARK INDEX
 ========================================================= */
 
 const LANDMARK = {
@@ -396,126 +400,131 @@ function setError(
 
 
 /* =========================================================
-   SELECTOR
+   EFFECT STATE
 ========================================================= */
 
-function initializeSceneSelector() {
-
-  modelSelector.innerHTML =
-    "";
-
-
-  const modes = [
-
-    {
-      value:
-        "both",
-
-      label:
-        "Butterfly + Waveboy"
-    },
-
-    {
-      value:
-        "butterfly",
-
-      label:
-        "Butterfly Only"
-    },
-
-    {
-      value:
-        "waveboy",
-
-      label:
-        "Waveboy Only"
-    }
-  ];
-
-
-  for (
-    const mode
-    of modes
-  ) {
-
-    const option =
-      document.createElement(
-        "option"
-      );
-
-    option.value =
-      mode.value;
-
-    option.textContent =
-      mode.label;
-
-    modelSelector.appendChild(
-      option
-    );
-  }
-
-
-  modelSelector.value =
-    sceneMode;
-}
-
-
-/* =========================================================
-   SCENE MODE
-========================================================= */
-
-function sceneModeIncludes(
+function effectIsEnabled(
   modelId
 ) {
 
-  if (
-    sceneMode === "both"
-  ) {
-
-    return true;
-  }
-
-  return (
-    sceneMode === modelId
+  return Boolean(
+    enabledEffects[
+      modelId
+    ]
   );
 }
 
 
-function updateSceneModeDebug() {
+function updateEffectDebug() {
+
+  const names =
+    [];
+
+  const behaviors =
+    [];
+
 
   if (
-    sceneMode === "both"
+    enabledEffects.butterfly
   ) {
 
-    activeModelStatus.textContent =
-      "Butterfly + Waveboy";
+    names.push(
+      "Butterfly"
+    );
 
-    behaviorStatus.textContent =
-      "ORBIT + SHOULDER";
+    behaviors.push(
+      "ORBIT"
+    );
+  }
 
-  } else if (
-    sceneMode === "butterfly"
+
+  if (
+    enabledEffects.waveboy
   ) {
 
-    activeModelStatus.textContent =
-      "Butterfly";
+    names.push(
+      "Waveboy"
+    );
 
-    behaviorStatus.textContent =
-      "ORBIT";
+    behaviors.push(
+      "SHOULDER"
+    );
+  }
 
-  } else {
 
-    activeModelStatus.textContent =
-      "Waveboy";
+  activeModelStatus.textContent =
+    names.length > 0
+      ? names.join(" + ")
+      : "None";
 
-    behaviorStatus.textContent =
-      "SHOULDER";
+
+  behaviorStatus.textContent =
+    behaviors.length > 0
+      ? behaviors.join(" + ")
+      : "None";
+}
+
+
+function updateEffectVisibility() {
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    if (
+      !effectIsEnabled(
+        instance.config.id
+      )
+    ) {
+
+      instance.anchor.visible =
+        false;
+    }
   }
 }
 
 
+function getCaptureEffectName() {
+
+  const names =
+    [];
+
+
+  if (
+    enabledEffects.butterfly
+  ) {
+
+    names.push(
+      "butterfly"
+    );
+  }
+
+
+  if (
+    enabledEffects.waveboy
+  ) {
+
+    names.push(
+      "waveboy"
+    );
+  }
+
+
+  if (
+    names.length === 0
+  ) {
+
+    return "no-effects";
+  }
+
+
+  return names.join("-");
+}
+
+
 /* =========================================================
-   DAMPING
+   DAMP
 ========================================================= */
 
 function damp(
@@ -551,6 +560,7 @@ function dampAngle(
     target -
     current;
 
+
   while (
     difference >
     Math.PI
@@ -559,6 +569,7 @@ function dampAngle(
     difference -=
       Math.PI * 2;
   }
+
 
   while (
     difference <
@@ -569,12 +580,14 @@ function dampAngle(
       Math.PI * 2;
   }
 
+
   const factor =
     1 -
     Math.exp(
       -smoothing *
       delta
     );
+
 
   return (
     current +
@@ -585,7 +598,7 @@ function dampAngle(
 
 
 /* =========================================================
-   THREE INITIALIZATION
+   THREE INITIALIZE
 ========================================================= */
 
 function initializeThree() {
@@ -656,6 +669,7 @@ function initializeThree() {
       2
     );
 
+
   scene.add(
     ambient
   );
@@ -667,11 +681,13 @@ function initializeThree() {
       2.5
     );
 
+
   directional.position.set(
     1,
     2,
     4
   );
+
 
   scene.add(
     directional
@@ -702,19 +718,17 @@ function validateModelConfig(
 
   if (
     !config ||
-    typeof config.id !==
-      "string"
+    !config.id
   ) {
 
     throw new Error(
-      "Invalid model ID"
+      "Invalid model config"
     );
   }
 
 
   if (
-    typeof config.path !==
-      "string" ||
+    !config.path ||
     !config.path
       .toLowerCase()
       .endsWith(".glb")
@@ -749,14 +763,14 @@ function validateModelConfig(
   ) {
 
     throw new Error(
-      `${config.id}: invalid scaleMultiplier`
+      `${config.id}: invalid scale`
     );
   }
 }
 
 
 /* =========================================================
-   LOAD ONE MODEL
+   LOAD MODEL
 ========================================================= */
 
 function loadModelInstance(
@@ -797,14 +811,11 @@ function loadModelInstance(
 
           try {
 
-            const instance =
-              validateAndCreateModelInstance(
+            resolve(
+              createModelInstance(
                 gltf,
                 config
-              );
-
-            resolve(
-              instance
+              )
             );
 
           } catch (error) {
@@ -832,10 +843,10 @@ function loadModelInstance(
 
 
 /* =========================================================
-   GLB VALIDATION
+   CREATE MODEL INSTANCE
 ========================================================= */
 
-function validateAndCreateModelInstance(
+function createModelInstance(
   gltf,
   config
 ) {
@@ -845,13 +856,14 @@ function validateAndCreateModelInstance(
   ) {
 
     throw new Error(
-      `${config.name}: GLB has no scene`
+      `${config.name}: no scene`
     );
   }
 
 
   let meshCount =
     0;
+
 
   const materials =
     new Set();
@@ -883,7 +895,7 @@ function validateAndCreateModelInstance(
       }
 
 
-      const meshMaterials =
+      const list =
         Array.isArray(
           object.material
         )
@@ -895,7 +907,7 @@ function validateAndCreateModelInstance(
 
       for (
         const material
-        of meshMaterials
+        of list
       ) {
 
         materials.add(
@@ -911,7 +923,7 @@ function validateAndCreateModelInstance(
   ) {
 
     throw new Error(
-      `${config.name}: no meshes`
+      `${config.name}: no mesh`
     );
   }
 
@@ -936,6 +948,7 @@ function validateAndCreateModelInstance(
   const size =
     new THREE.Vector3();
 
+
   const center =
     new THREE.Vector3();
 
@@ -944,27 +957,10 @@ function validateAndCreateModelInstance(
     size
   );
 
+
   box.getCenter(
     center
   );
-
-
-  if (
-    !Number.isFinite(
-      size.x
-    ) ||
-    !Number.isFinite(
-      size.y
-    ) ||
-    !Number.isFinite(
-      size.z
-    )
-  ) {
-
-    throw new Error(
-      `${config.name}: invalid bounding box`
-    );
-  }
 
 
   const maxDimension =
@@ -976,10 +972,10 @@ function validateAndCreateModelInstance(
 
 
   if (
-    maxDimension <= 0 ||
     !Number.isFinite(
       maxDimension
-    )
+    ) ||
+    maxDimension <= 0
   ) {
 
     throw new Error(
@@ -1058,31 +1054,18 @@ function validateAndCreateModelInstance(
 
 
   console.log(
-    `[${config.name}] GLB validation`,
-    {
-      path:
-        config.path,
-
-      meshes:
-        meshCount,
-
-      materials:
-        materials.size,
-
-      size:
-        size.toArray(),
-
-      animations:
-        clipNames
-    }
+    `[${config.name}] animations:`,
+    clipNames
   );
 
 
   let mixer =
     null;
 
+
   let action =
     null;
+
 
   let selectedClipName =
     "None";
@@ -1107,26 +1090,20 @@ function validateAndCreateModelInstance(
     ) {
 
       throw new Error(
-        `${config.name}: animationIndex ${requestedIndex} invalid. Clips: ${clipNames.join(", ")}`
+        `${config.name}: invalid animationIndex ${requestedIndex}`
       );
     }
 
 
-    const selectedClip =
+    const clip =
       animations[
         requestedIndex
       ];
 
 
     selectedClipName =
-      selectedClip.name ||
+      clip.name ||
       `Clip ${requestedIndex}`;
-
-
-    console.log(
-      `[${config.name}] Selected clip`,
-      selectedClipName
-    );
 
 
     mixer =
@@ -1137,16 +1114,18 @@ function validateAndCreateModelInstance(
 
     action =
       mixer.clipAction(
-        selectedClip
+        clip
       );
 
 
     action.reset();
 
+
     action.setLoop(
       THREE.LoopRepeat,
       Infinity
     );
+
 
     action.play();
   }
@@ -1186,7 +1165,7 @@ function validateAndCreateModelInstance(
 
 
 /* =========================================================
-   LOAD ALL MODELS
+   LOAD ALL
 ========================================================= */
 
 async function loadAllModels() {
@@ -1210,6 +1189,9 @@ async function loadAllModels() {
             )
         )
       );
+
+
+    modelInstances.clear();
 
 
     for (
@@ -1257,14 +1239,14 @@ async function loadAllModels() {
 
 
     setStatus(
-      "Multi-model load failed"
+      "Model load failed"
     );
   }
 }
 
 
 /* =========================================================
-   COMBINED MODEL DEBUG
+   MODEL DEBUG
 ========================================================= */
 
 function updateCombinedModelDebug() {
@@ -1382,12 +1364,12 @@ function updateCombinedModelDebug() {
       .join(" | ");
 
 
-  updateSceneModeDebug();
+  updateEffectDebug();
 }
 
 
 /* =========================================================
-   READY
+   READY / CONTROLS
 ========================================================= */
 
 function systemReady() {
@@ -1412,7 +1394,11 @@ function updateControls() {
     cameraRunning;
 
 
-  modelSelector.disabled =
+  butterflyToggle.disabled =
+    !allModelsReady;
+
+
+  waveboyToggle.disabled =
     !allModelsReady;
 
 
@@ -1535,6 +1521,7 @@ async function initializeMediaPipe() {
 
     clearError();
 
+
     updateControls();
 
   } catch (error) {
@@ -1635,11 +1622,14 @@ async function startCamera() {
     video.style.display =
       "block";
 
+
     threeLayer.style.display =
       "block";
 
+
     overlay.style.display =
       "block";
+
 
     placeholder.style.display =
       "none";
@@ -1658,6 +1648,7 @@ async function startCamera() {
 
 
     resizeOverlay();
+
 
     resizeThree();
 
@@ -1709,7 +1700,7 @@ async function startCamera() {
 
 
     setStatus(
-      "Multi-effect scene running"
+      "Human AR running"
     );
 
 
@@ -1740,7 +1731,7 @@ async function startCamera() {
 
 
 /* =========================================================
-   STOP / SWITCH CAMERA
+   STOP / SWITCH
 ========================================================= */
 
 function hideAllModels() {
@@ -1763,12 +1754,14 @@ function stopStream() {
 
 
   if (
-    animationFrameId !== null
+    animationFrameId !==
+    null
   ) {
 
     cancelAnimationFrame(
       animationFrameId
     );
+
 
     animationFrameId =
       null;
@@ -1800,8 +1793,10 @@ function stopStream() {
   video.style.display =
     "none";
 
+
   threeLayer.style.display =
     "none";
+
 
   overlay.style.display =
     "none";
@@ -1970,11 +1965,14 @@ function resizeThree() {
   threeCamera.left =
     0;
 
+
   threeCamera.right =
     1;
 
+
   threeCamera.top =
     1;
+
 
   threeCamera.bottom =
     0;
@@ -1996,7 +1994,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT FIT COVER
+   COVER TRANSFORM
 ========================================================= */
 
 function getCoverTransform() {
@@ -2004,11 +2002,14 @@ function getCoverTransform() {
   const sourceWidth =
     video.videoWidth;
 
+
   const sourceHeight =
     video.videoHeight;
 
+
   const displayWidth =
     overlay.width;
+
 
   const displayHeight =
     overlay.height;
@@ -2078,7 +2079,7 @@ function getCoverTransform() {
 
 
 /* =========================================================
-   LANDMARK MAPPING
+   LANDMARK MAP
 ========================================================= */
 
 function landmarkToCanvas(
@@ -2156,7 +2157,7 @@ function canvasToThree(
 
 
 /* =========================================================
-   UTILITIES
+   UTILITY
 ========================================================= */
 
 function distance2D(
@@ -2167,6 +2168,7 @@ function distance2D(
   const dx =
     a.x -
     b.x;
+
 
   const dy =
     a.y -
@@ -2245,7 +2247,7 @@ function smoothStep(
 
 
 /* =========================================================
-   BODY TRACKING
+   BODY TRACK
 ========================================================= */
 
 function updateTrackedBody(
@@ -2504,7 +2506,8 @@ function handleSegmentationResult(
     if (
       !result ||
       !result.confidenceMasks ||
-      result.confidenceMasks.length === 0
+      result.confidenceMasks.length ===
+        0
     ) {
 
       segmentationMaskReady =
@@ -2577,6 +2580,7 @@ function handleSegmentationResult(
       maskCanvas.width =
         width;
 
+
       maskCanvas.height =
         height;
     }
@@ -2613,16 +2617,27 @@ function handleSegmentationResult(
         255;
 
 
-      rgba[targetIndex] =
+      rgba[
+        targetIndex
+      ] =
         255;
 
-      rgba[targetIndex + 1] =
+
+      rgba[
+        targetIndex + 1
+      ] =
         255;
 
-      rgba[targetIndex + 2] =
+
+      rgba[
+        targetIndex + 2
+      ] =
         255;
 
-      rgba[targetIndex + 3] =
+
+      rgba[
+        targetIndex + 3
+      ] =
         alpha;
 
 
@@ -2757,7 +2772,7 @@ function drawCoverSource(
 
 
 /* =========================================================
-   HUMAN OCCLUSION
+   OCCLUSION
 ========================================================= */
 
 function buildHumanOcclusionLayer() {
@@ -2827,7 +2842,7 @@ function buildHumanOcclusionLayer() {
 function shouldUseHumanOcclusion() {
 
   return (
-    sceneModeIncludes(
+    effectIsEnabled(
       "butterfly"
     ) &&
     orbitDepth < 0
@@ -2936,13 +2951,11 @@ function updateOrbitBehavior(
 
 
   const bodyReference =
-    (
-      trackedBody.shoulderWidth *
-      0.65
-      +
-      trackedBody.torsoHeight *
-      0.35
-    );
+    trackedBody.shoulderWidth *
+    0.65
+    +
+    trackedBody.torsoHeight *
+    0.35;
 
 
   const baseScale =
@@ -3051,16 +3064,20 @@ function updateOrbitBehavior(
     true;
 
 
-  return (
+  const depthText =
     orbitDepth >= 0
-      ? "Butterfly ORBIT FRONT"
-      : "Butterfly ORBIT BACK"
+      ? "FRONT"
+      : "BACK";
+
+
+  return (
+    `Butterfly ORBIT ${depthText}`
   );
 }
 
 
 /* =========================================================
-   SHOULDER BEHAVIOR
+   SHOULDER
 ========================================================= */
 
 function updateShoulderBehavior(
@@ -3098,11 +3115,6 @@ function updateShoulderBehavior(
       : 0.25;
 
 
-  /*
-    Determine visual left/right shoulder AFTER
-    camera mirroring has already been applied.
-  */
-
   let screenLeftX;
   let screenLeftY;
 
@@ -3118,11 +3130,14 @@ function updateShoulderBehavior(
     screenLeftX =
       trackedBody.leftShoulderX;
 
+
     screenLeftY =
       trackedBody.leftShoulderY;
 
+
     screenRightX =
       trackedBody.rightShoulderX;
+
 
     screenRightY =
       trackedBody.rightShoulderY;
@@ -3132,11 +3147,14 @@ function updateShoulderBehavior(
     screenLeftX =
       trackedBody.rightShoulderX;
 
+
     screenLeftY =
       trackedBody.rightShoulderY;
 
+
     screenRightX =
       trackedBody.leftShoulderX;
+
 
     screenRightY =
       trackedBody.leftShoulderY;
@@ -3178,19 +3196,12 @@ function updateShoulderBehavior(
 
 
   const bodyReference =
-    (
-      trackedBody.shoulderWidth *
-      0.65
-      +
-      trackedBody.torsoHeight *
-      0.35
-    );
+    trackedBody.shoulderWidth *
+    0.65
+    +
+    trackedBody.torsoHeight *
+    0.35;
 
-
-  /*
-    Keep the M8.5 Waveboy size
-    that already passed front/rear camera testing.
-  */
 
   const shoulderScaleFactor =
     0.88;
@@ -3274,7 +3285,7 @@ function updateShoulderBehavior(
 
 
 /* =========================================================
-   BESIDE BEHAVIOR
+   BESIDE
 ========================================================= */
 
 function updateBesideBehavior(
@@ -3326,13 +3337,11 @@ function updateBesideBehavior(
 
 
   const bodyReference =
-    (
-      trackedBody.shoulderWidth *
-      0.65
-      +
-      trackedBody.torsoHeight *
-      0.35
-    );
+    trackedBody.shoulderWidth *
+    0.65
+    +
+    trackedBody.torsoHeight *
+    0.35;
 
 
   const targetScale =
@@ -3405,12 +3414,14 @@ function updateBesideBehavior(
     true;
 
 
-  return `${config.name} BESIDE`;
+  return (
+    `${config.name} BESIDE`
+  );
 }
 
 
 /* =========================================================
-   UPDATE ALL MODEL BEHAVIORS
+   ALL MODEL BEHAVIORS
 ========================================================= */
 
 function updateAllModelBehaviors(
@@ -3423,18 +3434,20 @@ function updateAllModelBehaviors(
 
     hideAllModels();
 
+
     anchorStatus.textContent =
       "Hidden";
+
 
     return;
   }
 
 
-  const debugParts =
+  const debug =
     [];
 
 
-  let orbitVisible =
+  let orbitActive =
     false;
 
 
@@ -3448,13 +3461,14 @@ function updateAllModelBehaviors(
 
 
     if (
-      !sceneModeIncludes(
+      !effectIsEnabled(
         config.id
       )
     ) {
 
       instance.anchor.visible =
         false;
+
 
       continue;
     }
@@ -3464,71 +3478,59 @@ function updateAllModelBehaviors(
       config.behavior
     ) {
 
-      case "ORBIT": {
+      case "ORBIT":
 
-        orbitVisible =
+        orbitActive =
           true;
 
-        const debug =
+
+        debug.push(
           updateOrbitBehavior(
             instance,
             delta
-          );
-
-        debugParts.push(
-          debug
+          )
         );
 
+
         break;
-      }
 
 
-      case "SHOULDER": {
+      case "SHOULDER":
 
-        const debug =
+        debug.push(
           updateShoulderBehavior(
             instance,
             delta
-          );
-
-        debugParts.push(
-          debug
+          )
         );
 
+
         break;
-      }
 
 
-      case "BESIDE": {
+      case "BESIDE":
 
-        const debug =
+        debug.push(
           updateBesideBehavior(
             instance,
             delta
-          );
-
-        debugParts.push(
-          debug
+          )
         );
 
+
         break;
-      }
 
 
       default:
 
         instance.anchor.visible =
           false;
-
-        debugParts.push(
-          `${config.name} unsupported`
-        );
     }
   }
 
 
   if (
-    !orbitVisible
+    !orbitActive
   ) {
 
     orbitDepth =
@@ -3537,14 +3539,14 @@ function updateAllModelBehaviors(
 
 
   anchorStatus.textContent =
-    debugParts.length
-      ? debugParts.join(" | ")
-      : "Hidden";
+    debug.length > 0
+      ? debug.join(" | ")
+      : "No effects";
 }
 
 
 /* =========================================================
-   UPDATE MODEL ANIMATIONS
+   ANIMATION
 ========================================================= */
 
 function updateModelAnimations(
@@ -3770,6 +3772,7 @@ async function capturePhoto() {
     captureStatus.textContent =
       "Camera not ready";
 
+
     return;
   }
 
@@ -3880,7 +3883,7 @@ async function capturePhoto() {
     ) {
 
       throw new Error(
-        "Unable to create capture image"
+        "Unable to create capture"
       );
     }
 
@@ -3911,7 +3914,7 @@ async function capturePhoto() {
 
 
     link.download =
-      `human-ar-${sceneMode}-${timestamp}.jpg`;
+      `human-ar-${getCaptureEffectName()}-${timestamp}.jpg`;
 
 
     document.body.appendChild(
@@ -4156,34 +4159,54 @@ stopButton.addEventListener(
 );
 
 
-modelSelector.addEventListener(
+butterflyToggle.addEventListener(
   "change",
-  event => {
+  () => {
 
-    sceneMode =
-      event.target.value;
+    enabledEffects.butterfly =
+      butterflyToggle.checked;
 
 
-    updateSceneModeDebug();
+    updateEffectVisibility();
+
+
+    updateEffectDebug();
 
 
     clearError();
 
 
-    if (
-      cameraRunning
-    ) {
+    setStatus(
+      enabledEffects.butterfly
+        ? "Butterfly enabled"
+        : "Butterfly disabled"
+    );
+  }
+);
 
-      setStatus(
-        `Scene mode: ${sceneMode}`
-      );
 
-    } else {
+waveboyToggle.addEventListener(
+  "change",
+  () => {
 
-      setStatus(
-        "Ready — Start Camera"
-      );
-    }
+    enabledEffects.waveboy =
+      waveboyToggle.checked;
+
+
+    updateEffectVisibility();
+
+
+    updateEffectDebug();
+
+
+    clearError();
+
+
+    setStatus(
+      enabledEffects.waveboy
+        ? "Waveboy enabled"
+        : "Waveboy disabled"
+    );
   }
 );
 
@@ -4193,6 +4216,7 @@ video.addEventListener(
   () => {
 
     resizeOverlay();
+
 
     resizeThree();
   }
@@ -4205,6 +4229,7 @@ window.addEventListener(
 
     resizeOverlay();
 
+
     resizeThree();
   }
 );
@@ -4215,32 +4240,49 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 8.6A — Dual Model Scene"
+  "[Human AR] Milestone 8.6B — Effect Toggles"
 );
 
 
 startButton.disabled =
   true;
 
+
 switchButton.disabled =
   true;
+
 
 captureButton.disabled =
   true;
 
+
 stopButton.disabled =
   true;
 
-modelSelector.disabled =
+
+butterflyToggle.disabled =
   true;
 
 
-initializeSceneSelector();
+waveboyToggle.disabled =
+  true;
+
+
+butterflyToggle.checked =
+  enabledEffects.butterfly;
+
+
+waveboyToggle.checked =
+  enabledEffects.waveboy;
+
+
+updateEffectDebug();
 
 
 try {
 
   initializeThree();
+
 
   loadAllModels();
 

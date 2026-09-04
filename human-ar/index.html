@@ -1,25 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
 
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  >
+  />
 
-  <title>
-    Human AR — M8.5 Shoulder Attach
-  </title>
+  <title>Human AR — M8.6B Effect Toggles</title>
 
-
-  <link
-    rel="stylesheet"
-    href="./style.css"
-  >
-
+  <link rel="stylesheet" href="./style.css" />
 
   <script type="importmap">
   {
@@ -29,14 +20,11 @@
     }
   }
   </script>
-
 </head>
-
 
 <body>
 
   <main class="app">
-
 
     <div class="top-bar">
 
@@ -47,101 +35,96 @@
         ← Back
       </a>
 
-
-      <span class="milestone">
-        Human AR — M8.5
-      </span>
-
-    </div>
-
-
-
-    <div class="camera-container">
-
-
-      <video
-        id="camera"
-        autoplay
-        playsinline
-        muted
-      ></video>
-
-
-      <div
-        id="three-layer"
-      ></div>
-
-
-      <canvas
-        id="pose-overlay"
-      ></canvas>
-
-
-      <div
-        id="camera-placeholder"
-        class="camera-placeholder"
-      >
-        Preparing Human AR...
+      <div class="milestone">
+        Human AR — M8.6B
       </div>
 
     </div>
 
 
+    <div class="camera-container">
+
+      <video
+        id="camera"
+        autoplay
+        muted
+        playsinline
+      ></video>
+
+      <div id="three-layer"></div>
+
+      <canvas id="pose-overlay"></canvas>
+
+      <div
+        id="camera-placeholder"
+        class="camera-placeholder"
+      >
+        Press Start Camera
+      </div>
+
+    </div>
+
+
+    <div class="effect-toggles">
+
+      <label>
+
+        <input
+          type="checkbox"
+          id="toggle-butterfly"
+          checked
+        />
+
+        Butterfly
+
+      </label>
+
+
+      <label>
+
+        <input
+          type="checkbox"
+          id="toggle-waveboy"
+          checked
+        />
+
+        Waveboy
+
+      </label>
+
+    </div>
+
 
     <div class="controls">
 
-
-      <select
-        id="model-selector"
-        disabled
-      >
-      </select>
-
-
-      <button
-        id="start-camera"
-        disabled
-      >
+      <button id="start-camera">
         Start Camera
       </button>
 
-
-      <button
-        id="switch-camera"
-        disabled
-      >
+      <button id="switch-camera">
         Switch Camera
       </button>
 
-
-      <button
-        id="capture-photo"
-        disabled
-      >
-        📸 Capture
+      <button id="capture-photo">
+        Capture Photo
       </button>
 
-
-      <button
-        id="stop-camera"
-        disabled
-      >
+      <button id="stop-camera">
         Stop Camera
       </button>
 
     </div>
 
 
-
     <section class="debug-panel">
 
       <h2>
-        Debug Status
+        Debug Panel
       </h2>
 
 
       <div class="debug-row">
-        <strong>System</strong>
+        <strong>Status</strong>
         <span id="status">Initializing...</span>
       </div>
 
@@ -201,7 +184,7 @@
 
 
       <div class="debug-row">
-        <strong>Model Size</strong>
+        <strong>Size</strong>
         <span id="size-status">Waiting...</span>
       </div>
 
@@ -213,14 +196,14 @@
 
 
       <div class="debug-row">
-        <strong>Animation Clips</strong>
+        <strong>Clips</strong>
         <span id="clip-status">Waiting...</span>
       </div>
 
 
       <div class="debug-row">
         <strong>Selected Clip</strong>
-        <span id="selected-clip-status">None</span>
+        <span id="selected-clip-status">Waiting...</span>
       </div>
 
 
@@ -244,9 +227,7 @@
 
       <div class="debug-row">
         <strong>Capture</strong>
-        <span id="capture-status">
-          Ready when camera starts
-        </span>
+        <span id="capture-status">Waiting...</span>
       </div>
 
 
@@ -266,5 +247,4 @@
   ></script>
 
 </body>
-
 </html>

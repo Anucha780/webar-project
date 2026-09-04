@@ -3311,81 +3311,85 @@ function updateShoulderBehavior(
 
 
   /*
-    IMPORTANT
+    Find the actual LEFT and RIGHT shoulder
+    on the displayed screen.
 
-    Do NOT depend on MediaPipe anatomical LEFT/RIGHT here.
-
-    We already transformed landmarks into the actual
-    displayed screen coordinates, including front-camera
-    mirroring.
-
-    Therefore we simply find which shoulder is visually
-    left/right on the current screen.
+    This already works with front-camera mirror
+    because landmarkToCanvas() handled the mirror.
   */
 
+  let screenLeftShoulderX;
+  let screenLeftShoulderY;
 
-  const leftScreenShoulder = {
-
-    x:
-      Math.min(
-        trackedBody.leftShoulderX,
-        trackedBody.rightShoulderX
-      ),
-
-    y:
-      trackedBody.leftShoulderX <
-      trackedBody.rightShoulderX
-        ? trackedBody.leftShoulderY
-        : trackedBody.rightShoulderY
-  };
+  let screenRightShoulderX;
+  let screenRightShoulderY;
 
 
-  const rightScreenShoulder = {
+  if (
+    trackedBody.leftShoulderX <
+    trackedBody.rightShoulderX
+  ) {
 
-    x:
-      Math.max(
-        trackedBody.leftShoulderX,
-        trackedBody.rightShoulderX
-      ),
+    screenLeftShoulderX =
+      trackedBody.leftShoulderX;
 
-    y:
-      trackedBody.leftShoulderX >
-      trackedBody.rightShoulderX
-        ? trackedBody.leftShoulderY
-        : trackedBody.rightShoulderY
-  };
+    screenLeftShoulderY =
+      trackedBody.leftShoulderY;
+
+    screenRightShoulderX =
+      trackedBody.rightShoulderX;
+
+    screenRightShoulderY =
+      trackedBody.rightShoulderY;
+
+  } else {
+
+    screenLeftShoulderX =
+      trackedBody.rightShoulderX;
+
+    screenLeftShoulderY =
+      trackedBody.rightShoulderY;
+
+    screenRightShoulderX =
+      trackedBody.leftShoulderX;
+
+    screenRightShoulderY =
+      trackedBody.leftShoulderY;
+  }
 
 
-  const selectedShoulder =
+  let targetX;
+  let targetY;
+
+
+  if (
     requestedSide === "left"
-      ? leftScreenShoulder
-      : rightScreenShoulder;
+  ) {
+
+    targetX =
+      screenLeftShoulderX -
+      trackedBody.shoulderWidth *
+      offsetX;
 
 
-  /*
-    Push OUTSIDE the body.
+    targetY =
+      screenLeftShoulderY +
+      trackedBody.torsoHeight *
+      offsetY;
 
-    Screen-left shoulder  -> negative X
-    Screen-right shoulder -> positive X
-  */
+  } else {
 
-  const outwardDirection =
-    requestedSide === "left"
-      ? -1
-      : 1;
-
-
-  const targetX =
-    selectedShoulder.x +
-    outwardDirection *
-    trackedBody.shoulderWidth *
-    offsetX;
+    targetX =
+      screenRightShoulderX +
+      trackedBody.shoulderWidth *
+      offsetX;
 
 
-  const targetY =
-    selectedShoulder.y +
-    trackedBody.torsoHeight *
-    offsetY;
+    targetY =
+      screenRightShoulderY +
+      trackedBody.torsoHeight *
+      offsetY;
+  }
 
 
   const bodyReference =
@@ -3471,69 +3475,6 @@ function updateShoulderBehavior(
   anchorStatus.textContent =
     `${activeModelConfig.name} | SHOULDER ${requestedSide.toUpperCase()} | scale ${smoothScale.toFixed(3)}`;
 }
-
-
-/* =========================================================
-   BEHAVIOR ROUTER
-========================================================= */
-
-function updateModelBehavior(
-  delta
-) {
-
-  if (
-    !activeModelConfig
-  ) {
-
-    modelAnchor.visible =
-      false;
-
-    return;
-  }
-
-
-  switch (
-    activeModelConfig.behavior
-  ) {
-
-    case "ORBIT":
-
-      updateOrbitBehavior(
-        delta
-      );
-
-      break;
-
-
-    case "BESIDE":
-
-      updateBesideBehavior(
-        delta
-      );
-
-      break;
-
-
-    case "SHOULDER":
-
-      updateShoulderBehavior(
-        delta
-      );
-
-      break;
-
-
-    default:
-
-      modelAnchor.visible =
-        false;
-
-
-      anchorStatus.textContent =
-        `Unsupported behavior: ${activeModelConfig.behavior}`;
-  }
-}
-
 
 /* =========================================================
    POSE DEBUG

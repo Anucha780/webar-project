@@ -177,7 +177,10 @@ const enabledEffects = {
     true,
 
   headtest: 
-    true  
+    true,  
+
+  torsotest: 
+    true
 };
 
 /* =========================================================

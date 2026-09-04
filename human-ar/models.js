@@ -119,8 +119,50 @@ export const MODEL_REGISTRY = [
 
       scaleFactor: 1
     }
-  }
+  },
 
+  {
+  id: "torsotest",
+
+  name: "Torso Test GLB",
+
+  path: "./models/waveboy.glb",
+
+  behavior: "TORSO_ATTACH",
+
+  scaleMultiplier: 0.5,
+
+  rotation: {
+    x: 0,
+    y: 0,
+    z: 0
+  },
+
+  animationIndex: 0,
+
+  torso: {
+
+    /*
+      0 = กึ่งกลางลำตัว
+    */
+
+    offsetX: 0,
+
+    /*
+      0 = ตรงกลาง torso
+      ค่าบวก = ขยับขึ้น
+      ค่าลบ = ขยับลง
+    */
+
+    offsetY: 0,
+
+    /*
+      scale เพิ่มเติมสำหรับ torso โดยเฉพาะ
+    */
+
+    scaleFactor: 1
+  }
+}
 ];
 
 

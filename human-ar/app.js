@@ -186,18 +186,14 @@ let previousMaskValues =
 const SEGMENTATION_INTERVAL_MS =
   1000 / 20;
 
-
 const MASK_CONFIDENCE_LOW =
   0.12;
-
 
 const MASK_CONFIDENCE_HIGH =
   0.52;
 
-
 const MASK_EXPANSION =
   1.02;
-
 
 const MASK_TEMPORAL_ALPHA =
   0.70;
@@ -256,29 +252,22 @@ let modelAnchor =
 
 /* =========================================================
    ORBIT
-
-   M6 values are intentionally unchanged.
 ========================================================= */
 
 const ORBIT_SPEED =
   1.6;
 
-
 const ORBIT_RADIUS_X =
   1.35;
-
 
 const ORBIT_RADIUS_Y =
   0.38;
 
-
 const ORBIT_CENTER_Y =
   0.12;
 
-
 const ORBIT_DEPTH_SCALE =
   0.25;
-
 
 const FOLLOW_ORBIT_DIRECTION =
   true;
@@ -291,14 +280,11 @@ const FOLLOW_ORBIT_DIRECTION =
 const POSITION_SMOOTHING =
   12;
 
-
 const SCALE_SMOOTHING =
   9;
 
-
 const ROTATION_SMOOTHING =
   8;
-
 
 const MIN_VISIBILITY =
   0.55;
@@ -325,12 +311,11 @@ const LANDMARK = {
 
 
 /* =========================================================
-   ORBIT STATE
+   TRACKING STATE
 ========================================================= */
 
 let orbitAngle =
   0;
-
 
 let orbitDepth =
   0;
@@ -567,8 +552,7 @@ function initializeThree() {
 
     renderer.setPixelRatio(
       Math.min(
-        window.devicePixelRatio ||
-        1,
+        window.devicePixelRatio || 1,
         2
       )
     );
@@ -759,14 +743,11 @@ function disposeLoadedModel() {
   loadedModel =
     null;
 
-
   mixer =
     null;
 
-
   activeAction =
     null;
-
 
   modelAnchor.visible =
     false;
@@ -782,30 +763,23 @@ function resetModelDebug() {
   glbLoadStatus.textContent =
     "Loading...";
 
-
   meshStatus.textContent =
     "Waiting...";
-
 
   materialStatus.textContent =
     "Waiting...";
 
-
   bboxStatus.textContent =
     "Waiting...";
-
 
   sizeStatus.textContent =
     "Waiting...";
 
-
   animationStatus.textContent =
     "Waiting...";
 
-
   clipStatus.textContent =
     "Waiting...";
-
 
   selectedClipStatus.textContent =
     "None";
@@ -813,7 +787,7 @@ function resetModelDebug() {
 
 
 /* =========================================================
-   LOAD MODEL FROM REGISTRY
+   LOAD MODEL
 ========================================================= */
 
 function loadActiveModel() {
@@ -824,14 +798,15 @@ function loadActiveModel() {
     );
 
 
-  if (!config) {
+  if (
+    !config
+  ) {
 
     setError(
       new Error(
         `Unknown model ID: ${activeModelId}`
       )
     );
-
 
     return;
   }
@@ -957,13 +932,6 @@ function loadActiveModel() {
 
 /* =========================================================
    GLB VALIDATION
-
-   Every model must pass:
-   mesh
-   material
-   bounding box
-   size
-   animations
 ========================================================= */
 
 function validateAndAttachModel(
@@ -1129,12 +1097,6 @@ function validateAndAttachModel(
 
 
   console.log(
-    `[${config.name}] Bounding Box`,
-    box
-  );
-
-
-  console.log(
     `[${config.name}] Size`,
     size
   );
@@ -1184,10 +1146,6 @@ function validateAndAttachModel(
   );
 
 
-  /*
-    Normalize GLB before body-relative scale.
-  */
-
   loadedModel.scale.setScalar(
     1 /
     maxDimension
@@ -1195,14 +1153,9 @@ function validateAndAttachModel(
 
 
   loadedModel.rotation.set(
-    config.rotation?.x ||
-      0,
-
-    config.rotation?.y ||
-      0,
-
-    config.rotation?.z ||
-      0
+    config.rotation?.x || 0,
+    config.rotation?.y || 0,
+    config.rotation?.z || 0
   );
 
 
@@ -1211,13 +1164,8 @@ function validateAndAttachModel(
   );
 
 
-  /* -----------------------------------------
-     Animation inspection
-  ----------------------------------------- */
-
   const animations =
-    gltf.animations ||
-    [];
+    gltf.animations || [];
 
 
   animationStatus.textContent =
@@ -1242,11 +1190,8 @@ function validateAndAttachModel(
 
 
   clipStatus.textContent =
-    clipNames.length >
-    0
-      ? clipNames.join(
-          ", "
-        )
+    clipNames.length > 0
+      ? clipNames.join(", ")
       : "None";
 
 
@@ -1261,8 +1206,7 @@ function validateAndAttachModel(
 
 
   if (
-    animations.length >
-    0
+    animations.length > 0
   ) {
 
     const requestedIndex =
@@ -1274,8 +1218,7 @@ function validateAndAttachModel(
 
 
     if (
-      requestedIndex <
-        0 ||
+      requestedIndex < 0 ||
       requestedIndex >=
         animations.length
     ) {
@@ -1377,8 +1320,7 @@ function updateControls() {
 
 
   modelSelector.disabled =
-    MODEL_REGISTRY.length ===
-    0;
+    MODEL_REGISTRY.length === 0;
 
 
   if (
@@ -1388,10 +1330,8 @@ function updateControls() {
     switchButton.disabled =
       false;
 
-
     captureButton.disabled =
       false;
-
 
     stopButton.disabled =
       false;
@@ -1401,10 +1341,8 @@ function updateControls() {
     switchButton.disabled =
       true;
 
-
     captureButton.disabled =
       true;
-
 
     stopButton.disabled =
       true;
@@ -1558,8 +1496,7 @@ async function initializeMediaPipe() {
 function updateCameraDisplay() {
 
   video.style.transform =
-    facingMode ===
-    "user"
+    facingMode === "user"
       ? "scaleX(-1)"
       : "none";
 }
@@ -1574,7 +1511,6 @@ async function startCamera() {
     setStatus(
       "System is not ready"
     );
-
 
     return;
   }
@@ -1708,7 +1644,7 @@ async function startCamera() {
 
 
     setStatus(
-      `M8.1 ${activeModelConfig.name} running`
+      `${activeModelConfig.name} running`
     );
 
 
@@ -1749,8 +1685,7 @@ function stopStream() {
 
 
   if (
-    animationFrameId !==
-    null
+    animationFrameId !== null
   ) {
 
     cancelAnimationFrame(
@@ -1871,8 +1806,7 @@ function stopCamera() {
 async function switchCamera() {
 
   facingMode =
-    facingMode ===
-    "user"
+    facingMode === "user"
       ? "environment"
       : "user";
 
@@ -1888,7 +1822,7 @@ async function switchCamera() {
    MODEL SWITCHING
 ========================================================= */
 
-async function changeModel(
+function changeModel(
   modelId
 ) {
 
@@ -1908,7 +1842,9 @@ async function changeModel(
     );
 
 
-  if (!config) {
+  if (
+    !config
+  ) {
 
     setError(
       new Error(
@@ -1916,24 +1852,12 @@ async function changeModel(
       )
     );
 
-
     return;
   }
 
 
-  /*
-    เพื่อ isolate model loading:
-    ถ้ากล้องกำลังทำงานอยู่ ให้หยุดก่อน
-
-    M8.2 ค่อยทำ hot-swap ขณะ camera running
-  */
-
-  const cameraWasRunning =
-    cameraRunning;
-
-
   if (
-    cameraWasRunning
+    cameraRunning
   ) {
 
     stopStream();
@@ -1963,8 +1887,7 @@ function resizeOverlay() {
 
 
   const dpr =
-    window.devicePixelRatio ||
-    1;
+    window.devicePixelRatio || 1;
 
 
   overlay.width =
@@ -2014,10 +1937,8 @@ function resizeThree() {
 
 
   if (
-    rect.width <=
-      0 ||
-    rect.height <=
-      0
+    rect.width <= 0 ||
+    rect.height <= 0
   ) {
 
     return;
@@ -2034,14 +1955,11 @@ function resizeThree() {
   threeCamera.left =
     0;
 
-
   threeCamera.right =
     1;
 
-
   threeCamera.top =
     1;
-
 
   threeCamera.bottom =
     0;
@@ -2136,21 +2054,19 @@ function getCoverTransform() {
       (
         renderedWidth -
         displayWidth
-      ) /
-      2,
+      ) / 2,
 
     cropY:
       (
         renderedHeight -
         displayHeight
-      ) /
-      2
+      ) / 2
   };
 }
 
 
 /* =========================================================
-   LANDMARK → CANVAS
+   LANDMARK -> CANVAS
 ========================================================= */
 
 function landmarkToCanvas(
@@ -2183,8 +2099,7 @@ function landmarkToCanvas(
 
 
   if (
-    facingMode ===
-    "user"
+    facingMode === "user"
   ) {
 
     sourceX =
@@ -2210,7 +2125,7 @@ function landmarkToCanvas(
 
 
 /* =========================================================
-   CANVAS → THREE
+   CANVAS -> THREE
 ========================================================= */
 
 function canvasToThree(
@@ -2254,10 +2169,8 @@ function distance2D(
 
 
   return Math.sqrt(
-    dx *
-    dx +
-    dy *
-    dy
+    dx * dx +
+    dy * dy
   );
 }
 
@@ -2320,8 +2233,7 @@ function smoothStep(
     t *
     (
       3 -
-      2 *
-      t
+      2 * t
     )
   );
 }
@@ -2420,16 +2332,14 @@ function updateTrackedBody(
       (
         ls.x +
         rs.x
-      ) /
-      2,
+      ) / 2,
 
 
     y:
       (
         ls.y +
         rs.y
-      ) /
-      2
+      ) / 2
   };
 
 
@@ -2439,16 +2349,14 @@ function updateTrackedBody(
       (
         lh.x +
         rh.x
-      ) /
-      2,
+      ) / 2,
 
 
     y:
       (
         lh.y +
         rh.y
-      ) /
-      2
+      ) / 2
   };
 
 
@@ -2458,16 +2366,14 @@ function updateTrackedBody(
       (
         shoulderCenter.x +
         hipCenter.x
-      ) /
-      2,
+      ) / 2,
 
 
     y:
       (
         shoulderCenter.y +
         hipCenter.y
-      ) /
-      2
+      ) / 2
   };
 
 
@@ -2518,8 +2424,7 @@ function requestSegmentation(
     !imageSegmenter ||
     segmentationBusy ||
     !trackedBody.valid ||
-    video.readyState <
-      2
+    video.readyState < 2
   ) {
 
     return;
@@ -2528,7 +2433,7 @@ function requestSegmentation(
 
   if (
     timestamp -
-      lastSegmentationTime <
+    lastSegmentationTime <
     SEGMENTATION_INTERVAL_MS
   ) {
 
@@ -2574,8 +2479,7 @@ function handleSegmentationResult(
     if (
       !result ||
       !result.confidenceMasks ||
-      result.confidenceMasks.length ===
-        0
+      result.confidenceMasks.length === 0
     ) {
 
       segmentationMaskReady =
@@ -2587,9 +2491,7 @@ function handleSegmentationResult(
 
 
     const mask =
-      result.confidenceMasks[
-        0
-      ];
+      result.confidenceMasks[0];
 
 
     const width =
@@ -2607,7 +2509,7 @@ function handleSegmentationResult(
     if (
       !previousMaskValues ||
       previousMaskValues.length !==
-        currentValues.length
+      currentValues.length
     ) {
 
       previousMaskValues =
@@ -2623,37 +2525,27 @@ function handleSegmentationResult(
     } else {
 
       for (
-        let i =
-          0;
-        i <
-        currentValues.length;
+        let i = 0;
+        i < currentValues.length;
         i++
       ) {
 
-        previousMaskValues[
-          i
-        ] =
-          previousMaskValues[
-            i
-          ] *
+        previousMaskValues[i] =
+          previousMaskValues[i] *
           (
             1 -
             MASK_TEMPORAL_ALPHA
           )
           +
-          currentValues[
-            i
-          ] *
+          currentValues[i] *
           MASK_TEMPORAL_ALPHA;
       }
     }
 
 
     if (
-      maskCanvas.width !==
-        width ||
-      maskCanvas.height !==
-        height
+      maskCanvas.width !== width ||
+      maskCanvas.height !== height
     ) {
 
       maskCanvas.width =
@@ -2678,17 +2570,13 @@ function handleSegmentationResult(
 
 
     for (
-      let i =
-        0;
-      i <
-        previousMaskValues.length;
+      let i = 0;
+      i < previousMaskValues.length;
       i++
     ) {
 
       const confidence =
-        previousMaskValues[
-          i
-        ];
+        previousMaskValues[i];
 
 
       const alpha =
@@ -2704,30 +2592,19 @@ function handleSegmentationResult(
         255;
 
 
-      rgba[
-        targetIndex
-      ] =
+      rgba[targetIndex] =
         255;
 
 
-      rgba[
-        targetIndex +
-        1
-      ] =
+      rgba[targetIndex + 1] =
         255;
 
 
-      rgba[
-        targetIndex +
-        2
-      ] =
+      rgba[targetIndex + 2] =
         255;
 
 
-      rgba[
-        targetIndex +
-        3
-      ] =
+      rgba[targetIndex + 3] =
         alpha;
 
 
@@ -2787,10 +2664,8 @@ function drawCoverSource(
   targetContext,
   source,
   transform,
-  expansion =
-    1,
-  mirror =
-    true
+  expansion = 1,
+  mirror = true
 ) {
 
   targetContext.save();
@@ -2824,20 +2699,17 @@ function drawCoverSource(
 
   const drawX =
     -transform.cropX -
-    extraWidth /
-    2;
+    extraWidth / 2;
 
 
   const drawY =
     -transform.cropY -
-    extraHeight /
-    2;
+    extraHeight / 2;
 
 
   if (
     mirror &&
-    facingMode ===
-      "user"
+    facingMode === "user"
   ) {
 
     targetContext.translate(
@@ -2854,15 +2726,10 @@ function drawCoverSource(
 
 
   targetContext.drawImage(
-
     source,
-
     drawX,
-
     drawY,
-
     drawWidth,
-
     drawHeight
   );
 
@@ -2939,11 +2806,44 @@ function buildHumanOcclusionLayer() {
 }
 
 
+function shouldUseHumanOcclusion() {
+
+  if (
+    !activeModelConfig
+  ) {
+
+    return false;
+  }
+
+
+  /*
+    ORBIT:
+    occlude only on the BACK half.
+
+    BESIDE:
+    character stays outside torso,
+    so human occlusion is not required.
+  */
+
+  if (
+    activeModelConfig.behavior ===
+    "ORBIT"
+  ) {
+
+    return (
+      orbitDepth < 0
+    );
+  }
+
+
+  return false;
+}
+
+
 function drawFullHumanOcclusion() {
 
   if (
-    orbitDepth >=
-    0
+    !shouldUseHumanOcclusion()
   ) {
 
     return;
@@ -2967,7 +2867,7 @@ function drawFullHumanOcclusion() {
 
 
 /* =========================================================
-   BEHAVIOR — ORBIT
+   ORBIT BEHAVIOR
 ========================================================= */
 
 function updateOrbitBehavior(
@@ -2994,13 +2894,11 @@ function updateOrbitBehavior(
 
   if (
     orbitAngle >
-    Math.PI *
-    2
+    Math.PI * 2
   ) {
 
     orbitAngle -=
-      Math.PI *
-      2;
+      Math.PI * 2;
   }
 
 
@@ -3018,8 +2916,7 @@ function updateOrbitBehavior(
 
   const orbitY =
     Math.sin(
-      orbitAngle *
-      2
+      orbitAngle * 2
     );
 
 
@@ -3061,16 +2958,9 @@ function updateOrbitBehavior(
     );
 
 
-  /*
-    IMPORTANT:
-    scaleMultiplier now comes
-    from the active model config.
-  */
-
   const baseScale =
     bodyReference *
-    activeModelConfig
-      .scaleMultiplier;
+    activeModelConfig.scaleMultiplier;
 
 
   const depthMultiplier =
@@ -3139,13 +3029,9 @@ function updateOrbitBehavior(
 
 
     const targetRotationY =
-      movementX >=
-      0
-        ? Math.PI /
-          2
-
-        : -Math.PI /
-          2;
+      movementX >= 0
+        ? Math.PI / 2
+        : -Math.PI / 2;
 
 
     modelAnchor.rotation.y =
@@ -3179,8 +3065,7 @@ function updateOrbitBehavior(
 
 
   const depthLabel =
-    orbitDepth >=
-    0
+    orbitDepth >= 0
       ? "FRONT"
       : "BACK";
 
@@ -3197,13 +3082,171 @@ function updateOrbitBehavior(
 
 
 /* =========================================================
-   BEHAVIOR ROUTER
+   BESIDE BEHAVIOR
+========================================================= */
 
-   Future:
-   ORBIT
-   BESIDE
-   SHOULDER
-   STATIC
+function updateBesideBehavior(
+  delta
+) {
+
+  if (
+    !trackedBody.valid ||
+    !activeModelConfig
+  ) {
+
+    modelAnchor.visible =
+      false;
+
+
+    return;
+  }
+
+
+  /*
+    Reset orbit depth because BESIDE
+    does not use fake front/back orbit.
+  */
+
+  orbitDepth =
+    0;
+
+
+  const beside =
+    activeModelConfig.beside || {};
+
+
+  const side =
+    beside.side === "left"
+      ? -1
+      : 1;
+
+
+  const distance =
+    Number.isFinite(
+      beside.distance
+    )
+      ? beside.distance
+      : 1.2;
+
+
+  const offsetY =
+    Number.isFinite(
+      beside.offsetY
+    )
+      ? beside.offsetY
+      : 0;
+
+
+  const targetX =
+    trackedBody.centerX +
+    side *
+    trackedBody.shoulderWidth *
+    distance;
+
+
+  const targetY =
+    trackedBody.centerY +
+    trackedBody.torsoHeight *
+    offsetY;
+
+
+  const bodyReference =
+    (
+      trackedBody.shoulderWidth *
+      0.65
+      +
+      trackedBody.torsoHeight *
+      0.35
+    );
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      bodyReference *
+      activeModelConfig.scaleMultiplier,
+
+      0.05,
+
+      1.2
+    );
+
+
+  modelAnchor.position.x =
+    damp(
+      modelAnchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.position.y =
+    damp(
+      modelAnchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.position.z =
+    0;
+
+
+  const smoothScale =
+    damp(
+      modelAnchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  /*
+    Waveboy stays upright.
+  */
+
+  modelAnchor.rotation.y =
+    dampAngle(
+      modelAnchor.rotation.y,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.rotation.z =
+    damp(
+      modelAnchor.rotation.z,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  modelAnchor.visible =
+    true;
+
+
+  const sideLabel =
+    side > 0
+      ? "RIGHT"
+      : "LEFT";
+
+
+  anchorStatus.textContent =
+    `${activeModelConfig.name} | BESIDE ${sideLabel} | scale ${smoothScale.toFixed(3)}`;
+}
+
+
+/* =========================================================
+   BEHAVIOR ROUTER
 ========================================================= */
 
 function updateModelBehavior(
@@ -3229,6 +3272,15 @@ function updateModelBehavior(
     case "ORBIT":
 
       updateOrbitBehavior(
+        delta
+      );
+
+      break;
+
+
+    case "BESIDE":
+
+      updateBesideBehavior(
         delta
       );
 
@@ -3269,8 +3321,7 @@ function drawLine(
 
 
   const dpr =
-    window.devicePixelRatio ||
-    1;
+    window.devicePixelRatio || 1;
 
 
   ctx.beginPath();
@@ -3293,8 +3344,7 @@ function drawLine(
 
 
   ctx.lineWidth =
-    2 *
-    dpr;
+    2 * dpr;
 
 
   ctx.stroke();
@@ -3312,8 +3362,7 @@ function drawPoint(
 
 
   const dpr =
-    window.devicePixelRatio ||
-    1;
+    window.devicePixelRatio || 1;
 
 
   ctx.beginPath();
@@ -3322,11 +3371,9 @@ function drawPoint(
   ctx.arc(
     point.x,
     point.y,
-    4 *
-    dpr,
+    4 * dpr,
     0,
-    Math.PI *
-    2
+    Math.PI * 2
   );
 
 
@@ -3447,8 +3494,7 @@ async function capturePhoto() {
   if (
     !cameraRunning ||
     !renderer ||
-    video.readyState <
-      2
+    video.readyState < 2
   ) {
 
     captureStatus.textContent =
@@ -3499,8 +3545,6 @@ async function capturePhoto() {
     );
 
 
-    /* CAMERA */
-
     captureCtx.globalCompositeOperation =
       "source-over";
 
@@ -3513,8 +3557,6 @@ async function capturePhoto() {
       true
     );
 
-
-    /* THREE */
 
     renderer.render(
       scene,
@@ -3531,11 +3573,8 @@ async function capturePhoto() {
     );
 
 
-    /* HUMAN OCCLUSION */
-
     if (
-      orbitDepth <
-        0 &&
+      shouldUseHumanOcclusion() &&
       segmentationMaskReady
     ) {
 
@@ -3635,7 +3674,6 @@ async function capturePhoto() {
 
     clearError();
 
-
   } catch (error) {
 
     captureStatus.textContent =
@@ -3704,10 +3742,9 @@ function predictPose() {
 
 
   if (
-    video.readyState >=
-      2 &&
+    video.readyState >= 2 &&
     video.currentTime !==
-      lastVideoTime
+    lastVideoTime
   ) {
 
     lastVideoTime =
@@ -3725,8 +3762,7 @@ function predictPose() {
 
       if (
         result.landmarks &&
-        result.landmarks.length >
-          0
+        result.landmarks.length > 0
       ) {
 
         personStatus.textContent =
@@ -3734,9 +3770,7 @@ function predictPose() {
 
 
         latestLandmarks =
-          result.landmarks[
-            0
-          ];
+          result.landmarks[0];
 
 
         updateTrackedBody(
@@ -3886,21 +3920,18 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 8.1 initialized"
+  "[Human AR] Milestone 8.3 initialized"
 );
 
 
 startButton.disabled =
   true;
 
-
 switchButton.disabled =
   true;
 
-
 captureButton.disabled =
   true;
-
 
 stopButton.disabled =
   true;
@@ -3912,7 +3943,6 @@ initializeModelSelector();
 try {
 
   initializeThree();
-
 
   loadActiveModel();
 

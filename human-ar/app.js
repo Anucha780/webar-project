@@ -11,9 +11,7 @@ import {
 } from "three/addons/loaders/GLTFLoader.js";
 
 import {
-  MODEL_REGISTRY,
-  DEFAULT_MODEL_ID,
-  getModelConfig
+  MODEL_REGISTRY
 } from "./models.js";
 
 
@@ -50,6 +48,7 @@ const captureButton =
 
 const stopButton =
   document.querySelector("#stop-camera");
+
 
 const statusElement =
   document.querySelector("#status");
@@ -113,48 +112,59 @@ const errorStatus =
    CAMERA / MEDIAPIPE STATE
 ========================================================= */
 
-let stream = null;
+let stream =
+  null;
 
-let facingMode = "user";
+let facingMode =
+  "user";
 
-let poseLandmarker = null;
+let poseLandmarker =
+  null;
 
-let imageSegmenter = null;
+let imageSegmenter =
+  null;
 
-let cameraRunning = false;
+let cameraRunning =
+  false;
 
-let animationFrameId = null;
+let animationFrameId =
+  null;
 
-let lastVideoTime = -1;
+let lastVideoTime =
+  -1;
 
 let lastFrameTimestamp =
   performance.now();
 
-let latestLandmarks = null;
+let latestLandmarks =
+  null;
 
 
 /* =========================================================
-   MODEL STATE
+   MULTI MODEL STATE
 ========================================================= */
 
-let activeModelId =
-  DEFAULT_MODEL_ID;
+const modelInstances =
+  new Map();
 
-let activeModelConfig =
-  null;
+let allModelsReady =
+  false;
 
-let loadedModel =
-  null;
 
-let mixer =
-  null;
+/*
+  Modes shown in the existing selector.
 
-let activeAction =
-  null;
+  both        = Butterfly + Waveboy
+  butterfly   = Butterfly only
+  waveboy     = Waveboy only
+*/
+
+let sceneMode =
+  "both";
 
 
 /* =========================================================
-   SEGMENTATION
+   SEGMENTATION STATE
 ========================================================= */
 
 let segmentationBusy =
@@ -168,6 +178,7 @@ let segmentationMaskReady =
 
 let previousMaskValues =
   null;
+
 
 const SEGMENTATION_INTERVAL_MS =
   1000 / 20;
@@ -200,11 +211,13 @@ const maskCtx =
     }
   );
 
+
 const compositeCanvas =
   document.createElement("canvas");
 
 const compositeCtx =
   compositeCanvas.getContext("2d");
+
 
 const captureCanvas =
   document.createElement("canvas");
@@ -214,20 +227,21 @@ const captureCtx =
 
 
 /* =========================================================
-   THREE.JS
+   THREE
 ========================================================= */
 
-let scene = null;
+let scene =
+  null;
 
-let threeCamera = null;
+let threeCamera =
+  null;
 
-let renderer = null;
-
-let modelAnchor = null;
+let renderer =
+  null;
 
 
 /* =========================================================
-   ORBIT SETTINGS
+   ORBIT
 ========================================================= */
 
 const ORBIT_SPEED =
@@ -249,6 +263,13 @@ const FOLLOW_ORBIT_DIRECTION =
   true;
 
 
+let orbitAngle =
+  0;
+
+let orbitDepth =
+  0;
+
+
 /* =========================================================
    SMOOTHING
 ========================================================= */
@@ -267,7 +288,7 @@ const MIN_VISIBILITY =
 
 
 /* =========================================================
-   LANDMARK INDEX
+   LANDMARKS
 ========================================================= */
 
 const LANDMARK = {
@@ -319,17 +340,6 @@ const trackedBody = {
   rightShoulderY:
     0.4
 };
-
-
-/* =========================================================
-   ORBIT STATE
-========================================================= */
-
-let orbitAngle =
-  0;
-
-let orbitDepth =
-  0;
 
 
 /* =========================================================
@@ -386,17 +396,46 @@ function setError(
 
 
 /* =========================================================
-   MODEL SELECTOR
+   SELECTOR
 ========================================================= */
 
-function initializeModelSelector() {
+function initializeSceneSelector() {
 
   modelSelector.innerHTML =
     "";
 
+
+  const modes = [
+
+    {
+      value:
+        "both",
+
+      label:
+        "Butterfly + Waveboy"
+    },
+
+    {
+      value:
+        "butterfly",
+
+      label:
+        "Butterfly Only"
+    },
+
+    {
+      value:
+        "waveboy",
+
+      label:
+        "Waveboy Only"
+    }
+  ];
+
+
   for (
-    const model
-    of MODEL_REGISTRY
+    const mode
+    of modes
   ) {
 
     const option =
@@ -405,21 +444,73 @@ function initializeModelSelector() {
       );
 
     option.value =
-      model.id;
+      mode.value;
 
     option.textContent =
-      model.name;
+      mode.label;
 
     modelSelector.appendChild(
       option
     );
   }
 
-  modelSelector.value =
-    activeModelId;
 
-  modelSelector.disabled =
-    MODEL_REGISTRY.length === 0;
+  modelSelector.value =
+    sceneMode;
+}
+
+
+/* =========================================================
+   SCENE MODE
+========================================================= */
+
+function sceneModeIncludes(
+  modelId
+) {
+
+  if (
+    sceneMode === "both"
+  ) {
+
+    return true;
+  }
+
+  return (
+    sceneMode === modelId
+  );
+}
+
+
+function updateSceneModeDebug() {
+
+  if (
+    sceneMode === "both"
+  ) {
+
+    activeModelStatus.textContent =
+      "Butterfly + Waveboy";
+
+    behaviorStatus.textContent =
+      "ORBIT + SHOULDER";
+
+  } else if (
+    sceneMode === "butterfly"
+  ) {
+
+    activeModelStatus.textContent =
+      "Butterfly";
+
+    behaviorStatus.textContent =
+      "ORBIT";
+
+  } else {
+
+    activeModelStatus.textContent =
+      "Waveboy";
+
+    behaviorStatus.textContent =
+      "SHOULDER";
+  }
 }
 
 
@@ -502,8 +593,10 @@ function initializeThree() {
   threeStatus.textContent =
     "Initializing...";
 
+
   scene =
     new THREE.Scene();
+
 
   threeCamera =
     new THREE.OrthographicCamera(
@@ -515,8 +608,10 @@ function initializeThree() {
       100
     );
 
+
   threeCamera.position.z =
     10;
+
 
   renderer =
     new THREE.WebGLRenderer({
@@ -531,10 +626,12 @@ function initializeThree() {
         true
     });
 
+
   renderer.setClearColor(
     0x000000,
     0
   );
+
 
   renderer.setPixelRatio(
     Math.min(
@@ -543,32 +640,15 @@ function initializeThree() {
     )
   );
 
+
   renderer.outputColorSpace =
     THREE.SRGBColorSpace;
+
 
   threeLayer.appendChild(
     renderer.domElement
   );
 
-  modelAnchor =
-    new THREE.Group();
-
-  modelAnchor.visible =
-    false;
-
-  modelAnchor.position.set(
-    0.5,
-    0.5,
-    0
-  );
-
-  modelAnchor.scale.setScalar(
-    0.1
-  );
-
-  scene.add(
-    modelAnchor
-  );
 
   const ambient =
     new THREE.AmbientLight(
@@ -579,6 +659,7 @@ function initializeThree() {
   scene.add(
     ambient
   );
+
 
   const directional =
     new THREE.DirectionalLight(
@@ -596,12 +677,15 @@ function initializeThree() {
     directional
   );
 
+
   resizeThree();
+
 
   renderer.render(
     scene,
     threeCamera
   );
+
 
   threeStatus.textContent =
     `Ready r${THREE.REVISION}`;
@@ -609,251 +693,138 @@ function initializeThree() {
 
 
 /* =========================================================
-   MODEL CLEANUP
+   MODEL CONFIG VALIDATION
 ========================================================= */
 
-function disposeLoadedModel() {
+function validateModelConfig(
+  config
+) {
 
   if (
-    mixer
+    !config ||
+    typeof config.id !==
+      "string"
   ) {
 
-    mixer.stopAllAction();
-  }
-
-  if (
-    loadedModel
-  ) {
-
-    loadedModel.traverse(
-      object => {
-
-        if (
-          !object.isMesh
-        ) {
-
-          return;
-        }
-
-        if (
-          object.geometry
-        ) {
-
-          object.geometry.dispose();
-        }
-
-        if (
-          !object.material
-        ) {
-
-          return;
-        }
-
-        const materials =
-          Array.isArray(
-            object.material
-          )
-            ? object.material
-            : [
-                object.material
-              ];
-
-        for (
-          const material
-          of materials
-        ) {
-
-          for (
-            const value
-            of Object.values(
-              material
-            )
-          ) {
-
-            if (
-              value &&
-              value.isTexture
-            ) {
-
-              value.dispose();
-            }
-          }
-
-          material.dispose();
-        }
-      }
-    );
-
-    modelAnchor.remove(
-      loadedModel
+    throw new Error(
+      "Invalid model ID"
     );
   }
 
-  loadedModel =
-    null;
-
-  mixer =
-    null;
-
-  activeAction =
-    null;
 
   if (
-    modelAnchor
+    typeof config.path !==
+      "string" ||
+    !config.path
+      .toLowerCase()
+      .endsWith(".glb")
   ) {
 
-    modelAnchor.visible =
-      false;
+    throw new Error(
+      `${config.id}: invalid GLB path`
+    );
+  }
+
+
+  if (
+    ![
+      "ORBIT",
+      "BESIDE",
+      "SHOULDER"
+    ].includes(
+      config.behavior
+    )
+  ) {
+
+    throw new Error(
+      `${config.id}: unsupported behavior ${config.behavior}`
+    );
+  }
+
+
+  if (
+    !Number.isFinite(
+      config.scaleMultiplier
+    )
+  ) {
+
+    throw new Error(
+      `${config.id}: invalid scaleMultiplier`
+    );
   }
 }
 
 
 /* =========================================================
-   MODEL DEBUG
+   LOAD ONE MODEL
 ========================================================= */
 
-function resetModelDebug() {
+function loadModelInstance(
+  config
+) {
 
-  glbLoadStatus.textContent =
-    "Loading...";
-
-  meshStatus.textContent =
-    "Waiting...";
-
-  materialStatus.textContent =
-    "Waiting...";
-
-  bboxStatus.textContent =
-    "Waiting...";
-
-  sizeStatus.textContent =
-    "Waiting...";
-
-  animationStatus.textContent =
-    "Waiting...";
-
-  clipStatus.textContent =
-    "Waiting...";
-
-  selectedClipStatus.textContent =
-    "None";
-}
-
-
-/* =========================================================
-   LOAD MODEL
-========================================================= */
-
-function loadActiveModel() {
-
-  const config =
-    getModelConfig(
-      activeModelId
-    );
-
-  if (
-    !config
-  ) {
-
-    setError(
-      new Error(
-        `Unknown model ID: ${activeModelId}`
-      )
-    );
-
-    return;
-  }
-
-  activeModelConfig =
-    config;
-
-  activeModelStatus.textContent =
-    config.name;
-
-  behaviorStatus.textContent =
-    config.behavior;
-
-  glbPathStatus.textContent =
-    config.path;
-
-  resetModelDebug();
-
-  setStatus(
-    `Loading ${config.name}...`
-  );
-
-  disposeLoadedModel();
-
-  const loader =
-    new GLTFLoader();
-
-  loader.load(
-
-    config.path,
-
-    gltf => {
+  return new Promise(
+    (
+      resolve,
+      reject
+    ) => {
 
       try {
 
-        validateAndAttachModel(
-          gltf,
+        validateModelConfig(
           config
         );
 
       } catch (error) {
 
-        glbLoadStatus.textContent =
-          "FAILED";
-
-        setError(
+        reject(
           error
         );
 
-        setStatus(
-          `${config.name} validation failed`
-        );
+        return;
       }
-    },
 
-    progress => {
 
-      if (
-        progress.total >
-        0
-      ) {
+      const loader =
+        new GLTFLoader();
 
-        const percent =
-          Math.round(
-            (
-              progress.loaded /
-              progress.total
-            ) *
-            100
+
+      loader.load(
+
+        config.path,
+
+        gltf => {
+
+          try {
+
+            const instance =
+              validateAndCreateModelInstance(
+                gltf,
+                config
+              );
+
+            resolve(
+              instance
+            );
+
+          } catch (error) {
+
+            reject(
+              error
+            );
+          }
+        },
+
+        undefined,
+
+        () => {
+
+          reject(
+            new Error(
+              `Unable to load ${config.path}`
+            )
           );
-
-        glbLoadStatus.textContent =
-          `${percent}%`;
-
-      } else {
-
-        glbLoadStatus.textContent =
-          "Loading...";
-      }
-    },
-
-    () => {
-
-      glbLoadStatus.textContent =
-        "FAILED";
-
-      setError(
-        new Error(
-          `Unable to load ${config.path}`
-        )
-      );
-
-      setStatus(
-        `${config.name} load failed`
+        }
       );
     }
   );
@@ -864,7 +835,7 @@ function loadActiveModel() {
    GLB VALIDATION
 ========================================================= */
 
-function validateAndAttachModel(
+function validateAndCreateModelInstance(
   gltf,
   config
 ) {
@@ -874,15 +845,17 @@ function validateAndAttachModel(
   ) {
 
     throw new Error(
-      "GLB has no scene"
+      `${config.name}: GLB has no scene`
     );
   }
+
 
   let meshCount =
     0;
 
   const materials =
     new Set();
+
 
   gltf.scene.traverse(
     object => {
@@ -894,10 +867,13 @@ function validateAndAttachModel(
         return;
       }
 
+
       meshCount++;
+
 
       object.frustumCulled =
         false;
+
 
       if (
         !object.material
@@ -906,49 +882,39 @@ function validateAndAttachModel(
         return;
       }
 
-      if (
+
+      const meshMaterials =
         Array.isArray(
           object.material
         )
+          ? object.material
+          : [
+              object.material
+            ];
+
+
+      for (
+        const material
+        of meshMaterials
       ) {
 
-        for (
-          const material
-          of object.material
-        ) {
-
-          materials.add(
-            material
-          );
-        }
-
-      } else {
-
         materials.add(
-          object.material
+          material
         );
       }
     }
   );
 
-  meshStatus.textContent =
-    String(
-      meshCount
-    );
-
-  materialStatus.textContent =
-    String(
-      materials.size
-    );
 
   if (
     meshCount === 0
   ) {
 
     throw new Error(
-      "GLB contains no mesh"
+      `${config.name}: no meshes`
     );
   }
+
 
   const box =
     new THREE.Box3()
@@ -956,20 +922,23 @@ function validateAndAttachModel(
         gltf.scene
       );
 
+
   if (
     box.isEmpty()
   ) {
 
     throw new Error(
-      "GLB bounding box is empty"
+      `${config.name}: empty bounding box`
     );
   }
+
 
   const size =
     new THREE.Vector3();
 
   const center =
     new THREE.Vector3();
+
 
   box.getSize(
     size
@@ -978,6 +947,7 @@ function validateAndAttachModel(
   box.getCenter(
     center
   );
+
 
   if (
     !Number.isFinite(
@@ -992,15 +962,10 @@ function validateAndAttachModel(
   ) {
 
     throw new Error(
-      "Invalid GLB bounding box"
+      `${config.name}: invalid bounding box`
     );
   }
 
-  bboxStatus.textContent =
-    "Valid";
-
-  sizeStatus.textContent =
-    `${size.x.toFixed(3)} × ${size.y.toFixed(3)} × ${size.z.toFixed(3)}`;
 
   const maxDimension =
     Math.max(
@@ -1008,6 +973,7 @@ function validateAndAttachModel(
       size.y,
       size.z
     );
+
 
   if (
     maxDimension <= 0 ||
@@ -1017,68 +983,110 @@ function validateAndAttachModel(
   ) {
 
     throw new Error(
-      "Invalid GLB dimensions"
+      `${config.name}: invalid model size`
     );
   }
 
-  loadedModel =
+
+  const root =
     gltf.scene;
 
-  loadedModel.position.set(
+
+  root.position.set(
     -center.x,
     -center.y,
     -center.z
   );
 
-  loadedModel.scale.setScalar(
+
+  root.scale.setScalar(
     1 /
     maxDimension
   );
 
-  loadedModel.rotation.set(
+
+  root.rotation.set(
     config.rotation?.x || 0,
     config.rotation?.y || 0,
     config.rotation?.z || 0
   );
 
-  modelAnchor.add(
-    loadedModel
+
+  const anchor =
+    new THREE.Group();
+
+
+  anchor.visible =
+    false;
+
+
+  anchor.position.set(
+    0.5,
+    0.5,
+    0
   );
+
+
+  anchor.scale.setScalar(
+    0.1
+  );
+
+
+  anchor.add(
+    root
+  );
+
+
+  scene.add(
+    anchor
+  );
+
 
   const animations =
     gltf.animations || [];
 
-  animationStatus.textContent =
-    String(
-      animations.length
-    );
 
   const clipNames =
     animations.map(
       (
         clip,
         index
-      ) => {
-
-        return (
-          clip.name ||
-          `Clip ${index}`
-        );
-      }
+      ) =>
+        clip.name ||
+        `Clip ${index}`
     );
 
-  clipStatus.textContent =
-    clipNames.length > 0
-      ? clipNames.join(", ")
-      : "None";
 
   console.log(
-    `[${config.name}] Animation clips`,
-    clipNames
+    `[${config.name}] GLB validation`,
+    {
+      path:
+        config.path,
+
+      meshes:
+        meshCount,
+
+      materials:
+        materials.size,
+
+      size:
+        size.toArray(),
+
+      animations:
+        clipNames
+    }
   );
 
-  selectedClipStatus.textContent =
+
+  let mixer =
+    null;
+
+  let action =
+    null;
+
+  let selectedClipName =
     "None";
+
 
   if (
     animations.length > 0
@@ -1091,6 +1099,7 @@ function validateAndAttachModel(
         ? config.animationIndex
         : 0;
 
+
     if (
       requestedIndex < 0 ||
       requestedIndex >=
@@ -1098,57 +1107,287 @@ function validateAndAttachModel(
     ) {
 
       throw new Error(
-        `Invalid animationIndex: ${requestedIndex}`
+        `${config.name}: animationIndex ${requestedIndex} invalid. Clips: ${clipNames.join(", ")}`
       );
     }
+
 
     const selectedClip =
       animations[
         requestedIndex
       ];
 
-    selectedClipStatus.textContent =
+
+    selectedClipName =
       selectedClip.name ||
       `Clip ${requestedIndex}`;
 
+
+    console.log(
+      `[${config.name}] Selected clip`,
+      selectedClipName
+    );
+
+
     mixer =
       new THREE.AnimationMixer(
-        loadedModel
+        root
       );
 
-    activeAction =
+
+    action =
       mixer.clipAction(
         selectedClip
       );
 
-    activeAction.reset();
 
-    activeAction.setLoop(
+    action.reset();
+
+    action.setLoop(
       THREE.LoopRepeat,
       Infinity
     );
 
-    activeAction.play();
+    action.play();
   }
 
-  modelAnchor.visible =
-    false;
 
-  glbLoadStatus.textContent =
-    "PASS";
+  return {
 
-  clearError();
+    config,
 
-  setStatus(
-    `${config.name} ready`
-  );
+    root,
 
-  updateControls();
+    anchor,
+
+    mixer,
+
+    action,
+
+    stats: {
+
+      meshes:
+        meshCount,
+
+      materials:
+        materials.size,
+
+      size,
+
+      animations:
+        animations.length,
+
+      clipNames,
+
+      selectedClipName
+    }
+  };
 }
 
 
 /* =========================================================
-   CONTROLS
+   LOAD ALL MODELS
+========================================================= */
+
+async function loadAllModels() {
+
+  allModelsReady =
+    false;
+
+
+  glbLoadStatus.textContent =
+    "Loading...";
+
+
+  try {
+
+    const instances =
+      await Promise.all(
+        MODEL_REGISTRY.map(
+          config =>
+            loadModelInstance(
+              config
+            )
+        )
+      );
+
+
+    for (
+      const instance
+      of instances
+    ) {
+
+      modelInstances.set(
+        instance.config.id,
+        instance
+      );
+    }
+
+
+    allModelsReady =
+      true;
+
+
+    updateCombinedModelDebug();
+
+
+    clearError();
+
+
+    setStatus(
+      "All models ready"
+    );
+
+
+    updateControls();
+
+  } catch (error) {
+
+    allModelsReady =
+      false;
+
+
+    glbLoadStatus.textContent =
+      "FAILED";
+
+
+    setError(
+      error
+    );
+
+
+    setStatus(
+      "Multi-model load failed"
+    );
+  }
+}
+
+
+/* =========================================================
+   COMBINED MODEL DEBUG
+========================================================= */
+
+function updateCombinedModelDebug() {
+
+  const instances =
+    Array.from(
+      modelInstances.values()
+    );
+
+
+  const totalMeshes =
+    instances.reduce(
+      (
+        total,
+        item
+      ) =>
+        total +
+        item.stats.meshes,
+      0
+    );
+
+
+  const totalMaterials =
+    instances.reduce(
+      (
+        total,
+        item
+      ) =>
+        total +
+        item.stats.materials,
+      0
+    );
+
+
+  const totalAnimations =
+    instances.reduce(
+      (
+        total,
+        item
+      ) =>
+        total +
+        item.stats.animations,
+      0
+    );
+
+
+  glbPathStatus.textContent =
+    instances
+      .map(
+        item =>
+          item.config.path
+      )
+      .join(" | ");
+
+
+  glbLoadStatus.textContent =
+    `PASS ${instances.length}/${MODEL_REGISTRY.length}`;
+
+
+  meshStatus.textContent =
+    String(
+      totalMeshes
+    );
+
+
+  materialStatus.textContent =
+    String(
+      totalMaterials
+    );
+
+
+  bboxStatus.textContent =
+    "Valid";
+
+
+  sizeStatus.textContent =
+    instances
+      .map(
+        item => {
+
+          const s =
+            item.stats.size;
+
+          return `${item.config.name}: ${s.x.toFixed(3)}×${s.y.toFixed(3)}×${s.z.toFixed(3)}`;
+        }
+      )
+      .join(" | ");
+
+
+  animationStatus.textContent =
+    String(
+      totalAnimations
+    );
+
+
+  clipStatus.textContent =
+    instances
+      .map(
+        item =>
+          `${item.config.name}: ${
+            item.stats.clipNames.length
+              ? item.stats.clipNames.join(", ")
+              : "None"
+          }`
+      )
+      .join(" | ");
+
+
+  selectedClipStatus.textContent =
+    instances
+      .map(
+        item =>
+          `${item.config.name}: ${item.stats.selectedClipName}`
+      )
+      .join(" | ");
+
+
+  updateSceneModeDebug();
+}
+
+
+/* =========================================================
+   READY
 ========================================================= */
 
 function systemReady() {
@@ -1157,8 +1396,7 @@ function systemReady() {
     poseLandmarker &&
     imageSegmenter &&
     renderer &&
-    loadedModel &&
-    activeModelConfig
+    allModelsReady
   );
 }
 
@@ -1168,21 +1406,27 @@ function updateControls() {
   const ready =
     systemReady();
 
+
   startButton.disabled =
     !ready ||
     cameraRunning;
 
+
   modelSelector.disabled =
-    MODEL_REGISTRY.length === 0;
+    !allModelsReady;
+
 
   switchButton.disabled =
     !cameraRunning;
 
+
   captureButton.disabled =
     !cameraRunning;
 
+
   stopButton.disabled =
     !cameraRunning;
+
 
   if (
     ready &&
@@ -1208,16 +1452,20 @@ async function initializeMediaPipe() {
       "Loading MediaPipe..."
     );
 
+
     mediapipeStatus.textContent =
       "Loading WASM...";
+
 
     const vision =
       await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
 
+
     mediapipeStatus.textContent =
       "Loading Pose...";
+
 
     poseLandmarker =
       await PoseLandmarker.createFromOptions(
@@ -1250,8 +1498,10 @@ async function initializeMediaPipe() {
         }
       );
 
+
     mediapipeStatus.textContent =
       "Loading Segmenter...";
+
 
     imageSegmenter =
       await ImageSegmenter.createFromOptions(
@@ -1278,8 +1528,10 @@ async function initializeMediaPipe() {
         }
       );
 
+
     mediapipeStatus.textContent =
       "Pose Ready | Seg Ready";
+
 
     clearError();
 
@@ -1290,9 +1542,11 @@ async function initializeMediaPipe() {
     mediapipeStatus.textContent =
       "Failed";
 
+
     setError(
       error
     );
+
 
     setStatus(
       "MediaPipe initialization failed"
@@ -1327,7 +1581,9 @@ async function startCamera() {
     return;
   }
 
+
   clearError();
+
 
   try {
 
@@ -1337,6 +1593,7 @@ async function startCamera() {
 
       stopStream();
     }
+
 
     stream =
       await navigator.mediaDevices
@@ -1364,12 +1621,16 @@ async function startCamera() {
           }
         });
 
+
     video.srcObject =
       stream;
 
+
     await video.play();
 
+
     updateCameraDisplay();
+
 
     video.style.display =
       "block";
@@ -1383,59 +1644,77 @@ async function startCamera() {
     placeholder.style.display =
       "none";
 
+
     cameraRunning =
       true;
+
 
     cameraStatus.textContent =
       "Running";
 
+
     captureStatus.textContent =
       "Ready";
+
 
     resizeOverlay();
 
     resizeThree();
 
+
     lastVideoTime =
       -1;
+
 
     lastFrameTimestamp =
       performance.now();
 
+
     lastSegmentationTime =
       0;
+
 
     segmentationBusy =
       false;
 
+
     segmentationMaskReady =
       false;
+
 
     previousMaskValues =
       null;
 
+
     latestLandmarks =
       null;
+
 
     orbitAngle =
       0;
 
+
     orbitDepth =
       0;
+
 
     trackedBody.valid =
       false;
 
-    modelAnchor.visible =
-      false;
+
+    hideAllModels();
+
 
     clearError();
 
+
     setStatus(
-      `${activeModelConfig.name} running`
+      "Multi-effect scene running"
     );
 
+
     updateControls();
+
 
     predictPose();
 
@@ -1444,13 +1723,16 @@ async function startCamera() {
     cameraRunning =
       false;
 
+
     setError(
       error
     );
 
+
     setStatus(
       "Camera failed"
     );
+
 
     updateControls();
   }
@@ -1461,10 +1743,24 @@ async function startCamera() {
    STOP / SWITCH CAMERA
 ========================================================= */
 
+function hideAllModels() {
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    instance.anchor.visible =
+      false;
+  }
+}
+
+
 function stopStream() {
 
   cameraRunning =
     false;
+
 
   if (
     animationFrameId !== null
@@ -1477,6 +1773,7 @@ function stopStream() {
     animationFrameId =
       null;
   }
+
 
   if (
     stream
@@ -1491,11 +1788,14 @@ function stopStream() {
     }
   }
 
+
   stream =
     null;
 
+
   video.srcObject =
     null;
+
 
   video.style.display =
     "none";
@@ -1506,48 +1806,60 @@ function stopStream() {
   overlay.style.display =
     "none";
 
+
   trackedBody.valid =
     false;
+
 
   latestLandmarks =
     null;
 
+
   segmentationMaskReady =
     false;
+
 
   segmentationBusy =
     false;
 
+
   previousMaskValues =
     null;
 
-  if (
-    modelAnchor
-  ) {
 
-    modelAnchor.visible =
-      false;
-  }
+  orbitDepth =
+    0;
+
+
+  hideAllModels();
+
 
   clearOverlay();
+
 
   cameraStatus.textContent =
     "Stopped";
 
+
   personStatus.textContent =
     "Not detected";
+
 
   anchorStatus.textContent =
     "Hidden";
 
+
   captureStatus.textContent =
     "Camera stopped";
+
 
   placeholder.style.display =
     "flex";
 
+
   placeholder.textContent =
     "Camera stopped";
+
 
   updateControls();
 }
@@ -1556,6 +1868,7 @@ function stopStream() {
 function stopCamera() {
 
   stopStream();
+
 
   setStatus(
     "Camera stopped"
@@ -1570,61 +1883,11 @@ async function switchCamera() {
       ? "environment"
       : "user";
 
+
   stopStream();
 
+
   await startCamera();
-}
-
-
-/* =========================================================
-   MODEL SWITCHING
-========================================================= */
-
-function changeModel(
-  modelId
-) {
-
-  if (
-    modelId ===
-      activeModelId &&
-    loadedModel
-  ) {
-
-    return;
-  }
-
-  const config =
-    getModelConfig(
-      modelId
-    );
-
-  if (
-    !config
-  ) {
-
-    setError(
-      new Error(
-        `Model not found: ${modelId}`
-      )
-    );
-
-    return;
-  }
-
-  if (
-    cameraRunning
-  ) {
-
-    stopStream();
-  }
-
-  activeModelId =
-    modelId;
-
-  modelSelector.value =
-    modelId;
-
-  loadActiveModel();
 }
 
 
@@ -1637,8 +1900,10 @@ function resizeOverlay() {
   const rect =
     overlay.getBoundingClientRect();
 
+
   const dpr =
     window.devicePixelRatio || 1;
+
 
   overlay.width =
     Math.round(
@@ -1646,20 +1911,25 @@ function resizeOverlay() {
       dpr
     );
 
+
   overlay.height =
     Math.round(
       rect.height *
       dpr
     );
 
+
   compositeCanvas.width =
     overlay.width;
+
 
   compositeCanvas.height =
     overlay.height;
 
+
   captureCanvas.width =
     overlay.width;
+
 
   captureCanvas.height =
     overlay.height;
@@ -1676,8 +1946,10 @@ function resizeThree() {
     return;
   }
 
+
   const rect =
     threeLayer.getBoundingClientRect();
+
 
   if (
     rect.width <= 0 ||
@@ -1687,11 +1959,13 @@ function resizeThree() {
     return;
   }
 
+
   renderer.setSize(
     rect.width,
     rect.height,
     false
   );
+
 
   threeCamera.left =
     0;
@@ -1704,6 +1978,7 @@ function resizeThree() {
 
   threeCamera.bottom =
     0;
+
 
   threeCamera.updateProjectionMatrix();
 }
@@ -1721,7 +1996,7 @@ function clearOverlay() {
 
 
 /* =========================================================
-   OBJECT-FIT COVER
+   OBJECT FIT COVER
 ========================================================= */
 
 function getCoverTransform() {
@@ -1738,6 +2013,7 @@ function getCoverTransform() {
   const displayHeight =
     overlay.height;
 
+
   if (
     !sourceWidth ||
     !sourceHeight ||
@@ -1747,6 +2023,7 @@ function getCoverTransform() {
 
     return null;
   }
+
 
   const scale =
     Math.max(
@@ -1758,13 +2035,16 @@ function getCoverTransform() {
       sourceHeight
     );
 
+
   const renderedWidth =
     sourceWidth *
     scale;
 
+
   const renderedHeight =
     sourceHeight *
     scale;
+
 
   return {
 
@@ -1798,7 +2078,7 @@ function getCoverTransform() {
 
 
 /* =========================================================
-   LANDMARK -> CANVAS
+   LANDMARK MAPPING
 ========================================================= */
 
 function landmarkToCanvas(
@@ -1807,6 +2087,7 @@ function landmarkToCanvas(
 
   const transform =
     getCoverTransform();
+
 
   if (
     !transform
@@ -1818,13 +2099,16 @@ function landmarkToCanvas(
     };
   }
 
+
   let sourceX =
     landmark.x *
     transform.sourceWidth;
 
+
   const sourceY =
     landmark.y *
     transform.sourceHeight;
+
 
   if (
     facingMode === "user"
@@ -1834,6 +2118,7 @@ function landmarkToCanvas(
       transform.sourceWidth -
       sourceX;
   }
+
 
   return {
 
@@ -1849,10 +2134,6 @@ function landmarkToCanvas(
   };
 }
 
-
-/* =========================================================
-   CANVAS -> THREE
-========================================================= */
 
 function canvasToThree(
   point
@@ -1891,6 +2172,7 @@ function distance2D(
     a.y -
     b.y;
 
+
   return Math.sqrt(
     dx * dx +
     dy * dy
@@ -1909,6 +2191,7 @@ function landmarkReliable(
     return false;
   }
 
+
   if (
     landmark.visibility ===
     undefined
@@ -1916,6 +2199,7 @@ function landmarkReliable(
 
     return true;
   }
+
 
   return (
     landmark.visibility >=
@@ -1940,12 +2224,14 @@ function smoothStep(
       edge0
     );
 
+
   t =
     THREE.MathUtils.clamp(
       t,
       0,
       1
     );
+
 
   return (
     t *
@@ -1971,20 +2257,24 @@ function updateTrackedBody(
       LANDMARK.LEFT_SHOULDER
     ];
 
+
   const rightShoulder =
     landmarks[
       LANDMARK.RIGHT_SHOULDER
     ];
+
 
   const leftHip =
     landmarks[
       LANDMARK.LEFT_HIP
     ];
 
+
   const rightHip =
     landmarks[
       LANDMARK.RIGHT_HIP
     ];
+
 
   const reliable =
     landmarkReliable(
@@ -2000,6 +2290,7 @@ function updateTrackedBody(
       rightHip
     );
 
+
   if (
     !reliable
   ) {
@@ -2007,31 +2298,33 @@ function updateTrackedBody(
     trackedBody.valid =
       false;
 
-    anchorStatus.textContent =
-      "Low confidence";
-
     return;
   }
+
 
   const ls =
     landmarkToCanvas(
       leftShoulder
     );
 
+
   const rs =
     landmarkToCanvas(
       rightShoulder
     );
+
 
   const lh =
     landmarkToCanvas(
       leftHip
     );
 
+
   const rh =
     landmarkToCanvas(
       rightHip
     );
+
 
   const shoulderCenter = {
 
@@ -2048,6 +2341,7 @@ function updateTrackedBody(
       ) / 2
   };
 
+
   const hipCenter = {
 
     x:
@@ -2062,6 +2356,7 @@ function updateTrackedBody(
         rh.y
       ) / 2
   };
+
 
   const torsoCanvas = {
 
@@ -2078,26 +2373,32 @@ function updateTrackedBody(
       ) / 2
   };
 
+
   const torsoThree =
     canvasToThree(
       torsoCanvas
     );
+
 
   const leftShoulderThree =
     canvasToThree(
       ls
     );
 
+
   const rightShoulderThree =
     canvasToThree(
       rs
     );
 
+
   trackedBody.centerX =
     torsoThree.x;
 
+
   trackedBody.centerY =
     torsoThree.y;
+
 
   trackedBody.shoulderWidth =
     distance2D(
@@ -2106,6 +2407,7 @@ function updateTrackedBody(
     ) /
     overlay.width;
 
+
   trackedBody.torsoHeight =
     distance2D(
       shoulderCenter,
@@ -2113,17 +2415,22 @@ function updateTrackedBody(
     ) /
     overlay.height;
 
+
   trackedBody.leftShoulderX =
     leftShoulderThree.x;
+
 
   trackedBody.leftShoulderY =
     leftShoulderThree.y;
 
+
   trackedBody.rightShoulderX =
     rightShoulderThree.x;
 
+
   trackedBody.rightShoulderY =
     rightShoulderThree.y;
+
 
   trackedBody.valid =
     true;
@@ -2148,6 +2455,7 @@ function requestSegmentation(
     return;
   }
 
+
   if (
     timestamp -
     lastSegmentationTime <
@@ -2157,11 +2465,14 @@ function requestSegmentation(
     return;
   }
 
+
   lastSegmentationTime =
     timestamp;
 
+
   segmentationBusy =
     true;
+
 
   try {
 
@@ -2175,6 +2486,7 @@ function requestSegmentation(
 
     segmentationBusy =
       false;
+
 
     setError(
       error
@@ -2201,17 +2513,22 @@ function handleSegmentationResult(
       return;
     }
 
+
     const mask =
       result.confidenceMasks[0];
+
 
     const width =
       mask.width;
 
+
     const height =
       mask.height;
 
+
     const currentValues =
       mask.getAsFloat32Array();
+
 
     if (
       !previousMaskValues ||
@@ -2223,6 +2540,7 @@ function handleSegmentationResult(
         new Float32Array(
           currentValues.length
         );
+
 
       previousMaskValues.set(
         currentValues
@@ -2248,6 +2566,7 @@ function handleSegmentationResult(
       }
     }
 
+
     if (
       maskCanvas.width !==
         width ||
@@ -2262,6 +2581,7 @@ function handleSegmentationResult(
         height;
     }
 
+
     const rgba =
       new Uint8ClampedArray(
         width *
@@ -2269,8 +2589,10 @@ function handleSegmentationResult(
         4
       );
 
+
     let targetIndex =
       0;
+
 
     for (
       let i = 0;
@@ -2281,6 +2603,7 @@ function handleSegmentationResult(
       const confidence =
         previousMaskValues[i];
 
+
       const alpha =
         smoothStep(
           MASK_CONFIDENCE_LOW,
@@ -2288,6 +2611,7 @@ function handleSegmentationResult(
           confidence
         ) *
         255;
+
 
       rgba[targetIndex] =
         255;
@@ -2301,9 +2625,11 @@ function handleSegmentationResult(
       rgba[targetIndex + 3] =
         alpha;
 
+
       targetIndex +=
         4;
     }
+
 
     maskCtx.putImageData(
 
@@ -2317,8 +2643,10 @@ function handleSegmentationResult(
       0
     );
 
+
     segmentationMaskReady =
       true;
+
 
     if (
       typeof mask.close ===
@@ -2332,6 +2660,7 @@ function handleSegmentationResult(
 
     segmentationMaskReady =
       false;
+
 
     setError(
       error
@@ -2359,12 +2688,14 @@ function drawCoverSource(
 
   targetContext.save();
 
+
   const extraWidth =
     transform.renderedWidth *
     (
       expansion -
       1
     );
+
 
   const extraHeight =
     transform.renderedHeight *
@@ -2373,21 +2704,26 @@ function drawCoverSource(
       1
     );
 
+
   const drawWidth =
     transform.renderedWidth +
     extraWidth;
+
 
   const drawHeight =
     transform.renderedHeight +
     extraHeight;
 
+
   const drawX =
     -transform.cropX -
     extraWidth / 2;
 
+
   const drawY =
     -transform.cropY -
     extraHeight / 2;
+
 
   if (
     mirror &&
@@ -2399,11 +2735,13 @@ function drawCoverSource(
       0
     );
 
+
     targetContext.scale(
       -1,
       1
     );
   }
+
 
   targetContext.drawImage(
     source,
@@ -2413,12 +2751,13 @@ function drawCoverSource(
     drawHeight
   );
 
+
   targetContext.restore();
 }
 
 
 /* =========================================================
-   OCCLUSION
+   HUMAN OCCLUSION
 ========================================================= */
 
 function buildHumanOcclusionLayer() {
@@ -2430,8 +2769,10 @@ function buildHumanOcclusionLayer() {
     return false;
   }
 
+
   const transform =
     getCoverTransform();
+
 
   if (
     !transform
@@ -2440,6 +2781,7 @@ function buildHumanOcclusionLayer() {
     return false;
   }
 
+
   compositeCtx.clearRect(
     0,
     0,
@@ -2447,8 +2789,10 @@ function buildHumanOcclusionLayer() {
     compositeCanvas.height
   );
 
+
   compositeCtx.globalCompositeOperation =
     "source-over";
+
 
   drawCoverSource(
     compositeCtx,
@@ -2458,8 +2802,10 @@ function buildHumanOcclusionLayer() {
     true
   );
 
+
   compositeCtx.globalCompositeOperation =
     "destination-in";
+
 
   drawCoverSource(
     compositeCtx,
@@ -2469,8 +2815,10 @@ function buildHumanOcclusionLayer() {
     true
   );
 
+
   compositeCtx.globalCompositeOperation =
     "source-over";
+
 
   return true;
 }
@@ -2478,24 +2826,12 @@ function buildHumanOcclusionLayer() {
 
 function shouldUseHumanOcclusion() {
 
-  if (
-    !activeModelConfig
-  ) {
-
-    return false;
-  }
-
-  if (
-    activeModelConfig.behavior ===
-    "ORBIT"
-  ) {
-
-    return (
-      orbitDepth < 0
-    );
-  }
-
-  return false;
+  return (
+    sceneModeIncludes(
+      "butterfly"
+    ) &&
+    orbitDepth < 0
+  );
 }
 
 
@@ -2508,12 +2844,14 @@ function drawFullHumanOcclusion() {
     return;
   }
 
+
   if (
     !buildHumanOcclusionLayer()
   ) {
 
     return;
   }
+
 
   ctx.drawImage(
     compositeCanvas,
@@ -2524,27 +2862,22 @@ function drawFullHumanOcclusion() {
 
 
 /* =========================================================
-   ORBIT
+   ORBIT BEHAVIOR
 ========================================================= */
 
 function updateOrbitBehavior(
+  instance,
   delta
 ) {
 
-  if (
-    !trackedBody.valid ||
-    !activeModelConfig
-  ) {
+  const config =
+    instance.config;
 
-    modelAnchor.visible =
-      false;
-
-    return;
-  }
 
   orbitAngle +=
     ORBIT_SPEED *
     delta;
+
 
   if (
     orbitAngle >
@@ -2555,43 +2888,52 @@ function updateOrbitBehavior(
       Math.PI * 2;
   }
 
+
   const orbitX =
     Math.cos(
       orbitAngle
     );
+
 
   orbitDepth =
     Math.sin(
       orbitAngle
     );
 
+
   const orbitY =
     Math.sin(
       orbitAngle * 2
     );
 
+
   const radiusX =
     trackedBody.shoulderWidth *
     ORBIT_RADIUS_X;
+
 
   const radiusY =
     trackedBody.torsoHeight *
     ORBIT_RADIUS_Y;
 
+
   const centerYOffset =
     trackedBody.torsoHeight *
     ORBIT_CENTER_Y;
+
 
   const targetX =
     trackedBody.centerX +
     orbitX *
     radiusX;
 
+
   const targetY =
     trackedBody.centerY +
     centerYOffset +
     orbitY *
     radiusY;
+
 
   const bodyReference =
     (
@@ -2602,14 +2944,17 @@ function updateOrbitBehavior(
       0.35
     );
 
+
   const baseScale =
     bodyReference *
-    activeModelConfig.scaleMultiplier;
+    config.scaleMultiplier;
+
 
   const depthMultiplier =
     1 +
     orbitDepth *
     ORBIT_DEPTH_SCALE;
+
 
   const targetScale =
     THREE.MathUtils.clamp(
@@ -2622,37 +2967,43 @@ function updateOrbitBehavior(
       1.2
     );
 
-  modelAnchor.position.x =
+
+  instance.anchor.position.x =
     damp(
-      modelAnchor.position.x,
+      instance.anchor.position.x,
       targetX,
       POSITION_SMOOTHING,
       delta
     );
 
-  modelAnchor.position.y =
+
+  instance.anchor.position.y =
     damp(
-      modelAnchor.position.y,
+      instance.anchor.position.y,
       targetY,
       POSITION_SMOOTHING,
       delta
     );
 
-  modelAnchor.position.z =
+
+  instance.anchor.position.z =
     orbitDepth *
     0.1;
 
+
   const smoothScale =
     damp(
-      modelAnchor.scale.x,
+      instance.anchor.scale.x,
       targetScale,
       SCALE_SMOOTHING,
       delta
     );
 
-  modelAnchor.scale.setScalar(
+
+  instance.anchor.scale.setScalar(
     smoothScale
   );
+
 
   if (
     FOLLOW_ORBIT_DIRECTION
@@ -2663,19 +3014,22 @@ function updateOrbitBehavior(
         orbitAngle
       );
 
+
     const targetRotationY =
       movementX >= 0
         ? Math.PI / 2
         : -Math.PI / 2;
 
-    modelAnchor.rotation.y =
+
+    instance.anchor.rotation.y =
       dampAngle(
-        modelAnchor.rotation.y,
+        instance.anchor.rotation.y,
         targetRotationY,
         ROTATION_SMOOTHING,
         delta
       );
   }
+
 
   const targetBank =
     THREE.MathUtils.degToRad(
@@ -2683,191 +3037,50 @@ function updateOrbitBehavior(
       12
     );
 
-  modelAnchor.rotation.z =
+
+  instance.anchor.rotation.z =
     damp(
-      modelAnchor.rotation.z,
+      instance.anchor.rotation.z,
       targetBank,
       ROTATION_SMOOTHING,
       delta
     );
 
-  modelAnchor.visible =
+
+  instance.anchor.visible =
     true;
 
-  const depthLabel =
+
+  return (
     orbitDepth >= 0
-      ? "FRONT"
-      : "BACK";
-
-  const maskLabel =
-    segmentationMaskReady
-      ? "MASK STABLE"
-      : "MASK WAIT";
-
-  anchorStatus.textContent =
-    `${activeModelConfig.name} | ORBIT ${depthLabel} | ${maskLabel} | scale ${smoothScale.toFixed(3)}`;
-}
-
-
-/* =========================================================
-   BESIDE
-========================================================= */
-
-function updateBesideBehavior(
-  delta
-) {
-
-  if (
-    !trackedBody.valid ||
-    !activeModelConfig
-  ) {
-
-    modelAnchor.visible =
-      false;
-
-    return;
-  }
-
-  orbitDepth =
-    0;
-
-  const beside =
-    activeModelConfig.beside || {};
-
-  const side =
-    beside.side === "left"
-      ? -1
-      : 1;
-
-  const distance =
-    Number.isFinite(
-      beside.distance
-    )
-      ? beside.distance
-      : 1.2;
-
-  const offsetY =
-    Number.isFinite(
-      beside.offsetY
-    )
-      ? beside.offsetY
-      : 0;
-
-  const targetX =
-    trackedBody.centerX +
-    side *
-    trackedBody.shoulderWidth *
-    distance;
-
-  const targetY =
-    trackedBody.centerY +
-    trackedBody.torsoHeight *
-    offsetY;
-
-  const bodyReference =
-    (
-      trackedBody.shoulderWidth *
-      0.65
-      +
-      trackedBody.torsoHeight *
-      0.35
-    );
-
-  const targetScale =
-    THREE.MathUtils.clamp(
-
-      bodyReference *
-      activeModelConfig.scaleMultiplier,
-
-      0.05,
-
-      1.2
-    );
-
-  modelAnchor.position.x =
-    damp(
-      modelAnchor.position.x,
-      targetX,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-  modelAnchor.position.y =
-    damp(
-      modelAnchor.position.y,
-      targetY,
-      POSITION_SMOOTHING,
-      delta
-    );
-
-  modelAnchor.position.z =
-    0;
-
-  const smoothScale =
-    damp(
-      modelAnchor.scale.x,
-      targetScale,
-      SCALE_SMOOTHING,
-      delta
-    );
-
-  modelAnchor.scale.setScalar(
-    smoothScale
+      ? "Butterfly ORBIT FRONT"
+      : "Butterfly ORBIT BACK"
   );
-
-  modelAnchor.rotation.y =
-    dampAngle(
-      modelAnchor.rotation.y,
-      0,
-      ROTATION_SMOOTHING,
-      delta
-    );
-
-  modelAnchor.rotation.z =
-    damp(
-      modelAnchor.rotation.z,
-      0,
-      ROTATION_SMOOTHING,
-      delta
-    );
-
-  modelAnchor.visible =
-    true;
-
-  anchorStatus.textContent =
-    `${activeModelConfig.name} | BESIDE | scale ${smoothScale.toFixed(3)}`;
 }
 
 
 /* =========================================================
-   SHOULDER
+   SHOULDER BEHAVIOR
 ========================================================= */
 
 function updateShoulderBehavior(
+  instance,
   delta
 ) {
 
-  if (
-    !trackedBody.valid ||
-    !activeModelConfig
-  ) {
+  const config =
+    instance.config;
 
-    modelAnchor.visible =
-      false;
-
-    return;
-  }
-
-  orbitDepth =
-    0;
 
   const shoulderConfig =
-    activeModelConfig.shoulder || {};
+    config.shoulder || {};
+
 
   const requestedSide =
     shoulderConfig.side === "left"
       ? "left"
       : "right";
+
 
   const offsetX =
     Number.isFinite(
@@ -2875,6 +3088,7 @@ function updateShoulderBehavior(
     )
       ? shoulderConfig.offsetX
       : 0.55;
+
 
   const offsetY =
     Number.isFinite(
@@ -2885,12 +3099,8 @@ function updateShoulderBehavior(
 
 
   /*
-    จุดสำคัญ:
-
-    landmarkToCanvas() จัดการ mirror ของกล้องหน้าไปแล้ว
-    ดังนั้นตรงนี้เราไม่สนใจ anatomical left/right
-
-    เราหาไหล่ที่อยู่ซ้ายและขวา "บนหน้าจอจริง"
+    Determine visual left/right shoulder AFTER
+    camera mirroring has already been applied.
   */
 
   let screenLeftX;
@@ -2946,6 +3156,7 @@ function updateShoulderBehavior(
       trackedBody.shoulderWidth *
       offsetX;
 
+
     targetY =
       screenLeftY +
       trackedBody.torsoHeight *
@@ -2953,17 +3164,11 @@ function updateShoulderBehavior(
 
   } else {
 
-    /*
-      Waveboy = right
-
-      ใช้ไหล่ที่อยู่ขวาสุดบนหน้าจอ
-      แล้วดันออกด้านขวาอีกเล็กน้อย
-    */
-
     targetX =
       screenRightX +
       trackedBody.shoulderWidth *
       offsetX;
+
 
     targetY =
       screenRightY +
@@ -2983,8 +3188,8 @@ function updateShoulderBehavior(
 
 
   /*
-    SHOULDER character ให้เล็กกว่า BESIDE/ORBIT เล็กน้อย
-    เพื่อไม่กินพื้นที่บนตัวคนมากเกินไป
+    Keep the M8.5 Waveboy size
+    that already passed front/rear camera testing.
   */
 
   const shoulderScaleFactor =
@@ -2995,7 +3200,7 @@ function updateShoulderBehavior(
     THREE.MathUtils.clamp(
 
       bodyReference *
-      activeModelConfig.scaleMultiplier *
+      config.scaleMultiplier *
       shoulderScaleFactor,
 
       0.04,
@@ -3004,120 +3209,361 @@ function updateShoulderBehavior(
     );
 
 
-  modelAnchor.position.x =
+  instance.anchor.position.x =
     damp(
-      modelAnchor.position.x,
+      instance.anchor.position.x,
       targetX,
       POSITION_SMOOTHING,
       delta
     );
 
-  modelAnchor.position.y =
+
+  instance.anchor.position.y =
     damp(
-      modelAnchor.position.y,
+      instance.anchor.position.y,
       targetY,
       POSITION_SMOOTHING,
       delta
     );
 
-  modelAnchor.position.z =
+
+  instance.anchor.position.z =
     0;
+
 
   const smoothScale =
     damp(
-      modelAnchor.scale.x,
+      instance.anchor.scale.x,
       targetScale,
       SCALE_SMOOTHING,
       delta
     );
 
-  modelAnchor.scale.setScalar(
+
+  instance.anchor.scale.setScalar(
     smoothScale
   );
 
 
-  /*
-    SHOULDER character ไม่หมุนตาม orbit
-  */
-
-  modelAnchor.rotation.y =
+  instance.anchor.rotation.y =
     dampAngle(
-      modelAnchor.rotation.y,
+      instance.anchor.rotation.y,
       0,
       ROTATION_SMOOTHING,
       delta
     );
 
-  modelAnchor.rotation.z =
+
+  instance.anchor.rotation.z =
     damp(
-      modelAnchor.rotation.z,
+      instance.anchor.rotation.z,
       0,
       ROTATION_SMOOTHING,
       delta
     );
 
-  modelAnchor.visible =
+
+  instance.anchor.visible =
     true;
 
-  anchorStatus.textContent =
-    `${activeModelConfig.name} | SHOULDER ${requestedSide.toUpperCase()} | scale ${smoothScale.toFixed(3)}`;
+
+  return (
+    `Waveboy SHOULDER ${requestedSide.toUpperCase()}`
+  );
 }
 
 
 /* =========================================================
-   BEHAVIOR ROUTER
+   BESIDE BEHAVIOR
 ========================================================= */
 
-function updateModelBehavior(
+function updateBesideBehavior(
+  instance,
+  delta
+) {
+
+  const config =
+    instance.config;
+
+
+  const beside =
+    config.beside || {};
+
+
+  const side =
+    beside.side === "left"
+      ? -1
+      : 1;
+
+
+  const distance =
+    Number.isFinite(
+      beside.distance
+    )
+      ? beside.distance
+      : 1.2;
+
+
+  const offsetY =
+    Number.isFinite(
+      beside.offsetY
+    )
+      ? beside.offsetY
+      : 0;
+
+
+  const targetX =
+    trackedBody.centerX +
+    side *
+    trackedBody.shoulderWidth *
+    distance;
+
+
+  const targetY =
+    trackedBody.centerY +
+    trackedBody.torsoHeight *
+    offsetY;
+
+
+  const bodyReference =
+    (
+      trackedBody.shoulderWidth *
+      0.65
+      +
+      trackedBody.torsoHeight *
+      0.35
+    );
+
+
+  const targetScale =
+    THREE.MathUtils.clamp(
+
+      bodyReference *
+      config.scaleMultiplier,
+
+      0.05,
+
+      1.2
+    );
+
+
+  instance.anchor.position.x =
+    damp(
+      instance.anchor.position.x,
+      targetX,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.y =
+    damp(
+      instance.anchor.position.y,
+      targetY,
+      POSITION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.position.z =
+    0;
+
+
+  const smoothScale =
+    damp(
+      instance.anchor.scale.x,
+      targetScale,
+      SCALE_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.scale.setScalar(
+    smoothScale
+  );
+
+
+  instance.anchor.rotation.y =
+    dampAngle(
+      instance.anchor.rotation.y,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.rotation.z =
+    damp(
+      instance.anchor.rotation.z,
+      0,
+      ROTATION_SMOOTHING,
+      delta
+    );
+
+
+  instance.anchor.visible =
+    true;
+
+
+  return `${config.name} BESIDE`;
+}
+
+
+/* =========================================================
+   UPDATE ALL MODEL BEHAVIORS
+========================================================= */
+
+function updateAllModelBehaviors(
   delta
 ) {
 
   if (
-    !activeModelConfig ||
-    !modelAnchor
+    !trackedBody.valid
   ) {
+
+    hideAllModels();
+
+    anchorStatus.textContent =
+      "Hidden";
 
     return;
   }
 
-  switch (
-    activeModelConfig.behavior
+
+  const debugParts =
+    [];
+
+
+  let orbitVisible =
+    false;
+
+
+  for (
+    const instance
+    of modelInstances.values()
   ) {
 
-    case "ORBIT":
-
-      updateOrbitBehavior(
-        delta
-      );
-
-      break;
+    const config =
+      instance.config;
 
 
-    case "BESIDE":
+    if (
+      !sceneModeIncludes(
+        config.id
+      )
+    ) {
 
-      updateBesideBehavior(
-        delta
-      );
-
-      break;
-
-
-    case "SHOULDER":
-
-      updateShoulderBehavior(
-        delta
-      );
-
-      break;
-
-
-    default:
-
-      modelAnchor.visible =
+      instance.anchor.visible =
         false;
 
-      anchorStatus.textContent =
-        `Unsupported behavior: ${activeModelConfig.behavior}`;
+      continue;
+    }
+
+
+    switch (
+      config.behavior
+    ) {
+
+      case "ORBIT": {
+
+        orbitVisible =
+          true;
+
+        const debug =
+          updateOrbitBehavior(
+            instance,
+            delta
+          );
+
+        debugParts.push(
+          debug
+        );
+
+        break;
+      }
+
+
+      case "SHOULDER": {
+
+        const debug =
+          updateShoulderBehavior(
+            instance,
+            delta
+          );
+
+        debugParts.push(
+          debug
+        );
+
+        break;
+      }
+
+
+      case "BESIDE": {
+
+        const debug =
+          updateBesideBehavior(
+            instance,
+            delta
+          );
+
+        debugParts.push(
+          debug
+        );
+
+        break;
+      }
+
+
+      default:
+
+        instance.anchor.visible =
+          false;
+
+        debugParts.push(
+          `${config.name} unsupported`
+        );
+    }
+  }
+
+
+  if (
+    !orbitVisible
+  ) {
+
+    orbitDepth =
+      0;
+  }
+
+
+  anchorStatus.textContent =
+    debugParts.length
+      ? debugParts.join(" | ")
+      : "Hidden";
+}
+
+
+/* =========================================================
+   UPDATE MODEL ANIMATIONS
+========================================================= */
+
+function updateModelAnimations(
+  delta
+) {
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    if (
+      instance.mixer
+    ) {
+
+      instance.mixer.update(
+        delta
+      );
+    }
   }
 }
 
@@ -3136,32 +3582,40 @@ function drawLine(
       landmarkA
     );
 
+
   const b =
     landmarkToCanvas(
       landmarkB
     );
 
+
   const dpr =
     window.devicePixelRatio || 1;
 
+
   ctx.beginPath();
+
 
   ctx.moveTo(
     a.x,
     a.y
   );
 
+
   ctx.lineTo(
     b.x,
     b.y
   );
 
+
   ctx.strokeStyle =
     "#00ff88";
+
 
   ctx.lineWidth =
     2 *
     dpr;
+
 
   ctx.stroke();
 }
@@ -3176,10 +3630,13 @@ function drawPoint(
       landmark
     );
 
+
   const dpr =
     window.devicePixelRatio || 1;
 
+
   ctx.beginPath();
+
 
   ctx.arc(
     point.x,
@@ -3189,8 +3646,10 @@ function drawPoint(
     Math.PI * 2
   );
 
+
   ctx.fillStyle =
     "#00ff88";
+
 
   ctx.fill();
 }
@@ -3205,52 +3664,63 @@ function drawPoseDebug(
       LANDMARK.LEFT_SHOULDER
     ];
 
+
   const rs =
     landmarks[
       LANDMARK.RIGHT_SHOULDER
     ];
+
 
   const lh =
     landmarks[
       LANDMARK.LEFT_HIP
     ];
 
+
   const rh =
     landmarks[
       LANDMARK.RIGHT_HIP
     ];
+
 
   drawLine(
     ls,
     rs
   );
 
+
   drawLine(
     ls,
     lh
   );
+
 
   drawLine(
     rs,
     rh
   );
 
+
   drawLine(
     lh,
     rh
   );
 
+
   drawPoint(
     ls
   );
+
 
   drawPoint(
     rs
   );
 
+
   drawPoint(
     lh
   );
+
 
   drawPoint(
     rh
@@ -3266,6 +3736,7 @@ function drawOverlay() {
 
   clearOverlay();
 
+
   if (
     !latestLandmarks ||
     !trackedBody.valid
@@ -3274,7 +3745,9 @@ function drawOverlay() {
     return;
   }
 
+
   drawFullHumanOcclusion();
+
 
   drawPoseDebug(
     latestLandmarks
@@ -3300,16 +3773,20 @@ async function capturePhoto() {
     return;
   }
 
+
   captureButton.disabled =
     true;
 
+
   captureStatus.textContent =
     "Capturing...";
+
 
   try {
 
     const transform =
       getCoverTransform();
+
 
     if (
       !transform
@@ -3320,11 +3797,14 @@ async function capturePhoto() {
       );
     }
 
+
     captureCanvas.width =
       overlay.width;
 
+
     captureCanvas.height =
       overlay.height;
+
 
     captureCtx.clearRect(
       0,
@@ -3333,8 +3813,10 @@ async function capturePhoto() {
       captureCanvas.height
     );
 
+
     captureCtx.globalCompositeOperation =
       "source-over";
+
 
     drawCoverSource(
       captureCtx,
@@ -3344,10 +3826,12 @@ async function capturePhoto() {
       true
     );
 
+
     renderer.render(
       scene,
       threeCamera
     );
+
 
     captureCtx.drawImage(
       renderer.domElement,
@@ -3356,6 +3840,7 @@ async function capturePhoto() {
       captureCanvas.width,
       captureCanvas.height
     );
+
 
     if (
       shouldUseHumanOcclusion() &&
@@ -3376,6 +3861,7 @@ async function capturePhoto() {
       }
     }
 
+
     const blob =
       await new Promise(
         resolve => {
@@ -3388,6 +3874,7 @@ async function capturePhoto() {
         }
       );
 
+
     if (
       !blob
     ) {
@@ -3397,10 +3884,12 @@ async function capturePhoto() {
       );
     }
 
+
     const url =
       URL.createObjectURL(
         blob
       );
+
 
     const timestamp =
       new Date()
@@ -3410,24 +3899,31 @@ async function capturePhoto() {
           "-"
         );
 
+
     const link =
       document.createElement(
         "a"
       );
 
+
     link.href =
       url;
 
+
     link.download =
-      `human-ar-${activeModelId}-${timestamp}.jpg`;
+      `human-ar-${sceneMode}-${timestamp}.jpg`;
+
 
     document.body.appendChild(
       link
     );
 
+
     link.click();
 
+
     link.remove();
+
 
     setTimeout(
       () => {
@@ -3440,8 +3936,10 @@ async function capturePhoto() {
       3000
     );
 
+
     captureStatus.textContent =
       "PASS — Photo captured";
+
 
     clearError();
 
@@ -3449,6 +3947,7 @@ async function capturePhoto() {
 
     captureStatus.textContent =
       "FAILED";
+
 
     setError(
       error
@@ -3481,8 +3980,10 @@ function predictPose() {
     return;
   }
 
+
   const now =
     performance.now();
+
 
   const delta =
     Math.min(
@@ -3494,17 +3995,15 @@ function predictPose() {
       0.1
     );
 
+
   lastFrameTimestamp =
     now;
 
-  if (
-    mixer
-  ) {
 
-    mixer.update(
-      delta
-    );
-  }
+  updateModelAnimations(
+    delta
+  );
+
 
   if (
     video.readyState >= 2 &&
@@ -3515,6 +4014,7 @@ function predictPose() {
     lastVideoTime =
       video.currentTime;
 
+
     try {
 
       const result =
@@ -3522,6 +4022,7 @@ function predictPose() {
           video,
           now
         );
+
 
       if (
         result.landmarks &&
@@ -3531,12 +4032,15 @@ function predictPose() {
         personStatus.textContent =
           "Detected";
 
+
         latestLandmarks =
           result.landmarks[0];
+
 
         updateTrackedBody(
           latestLandmarks
         );
+
 
         requestSegmentation(
           now
@@ -3547,20 +4051,25 @@ function predictPose() {
         personStatus.textContent =
           "Not detected";
 
+
         trackedBody.valid =
           false;
+
 
         latestLandmarks =
           null;
 
+
         segmentationMaskReady =
           false;
+
 
         previousMaskValues =
           null;
 
-        modelAnchor.visible =
-          false;
+
+        hideAllModels();
+
 
         anchorStatus.textContent =
           "Hidden";
@@ -3568,50 +4077,49 @@ function predictPose() {
 
     } catch (error) {
 
-      modelAnchor.visible =
-        false;
+      hideAllModels();
+
 
       anchorStatus.textContent =
-        "Error";
+        "Pose Error";
+
 
       setError(
         error
       );
-
-      animationFrameId =
-        requestAnimationFrame(
-          predictPose
-        );
-
-      return;
     }
   }
 
+
   try {
 
-    updateModelBehavior(
+    updateAllModelBehaviors(
       delta
     );
 
   } catch (error) {
 
-    modelAnchor.visible =
-      false;
+    hideAllModels();
+
 
     anchorStatus.textContent =
       "Behavior Error";
+
 
     setError(
       error
     );
   }
 
+
   renderer.render(
     scene,
     threeCamera
   );
 
+
   drawOverlay();
+
 
   animationFrameId =
     requestAnimationFrame(
@@ -3629,30 +4137,56 @@ startButton.addEventListener(
   startCamera
 );
 
+
 switchButton.addEventListener(
   "click",
   switchCamera
 );
+
 
 captureButton.addEventListener(
   "click",
   capturePhoto
 );
 
+
 stopButton.addEventListener(
   "click",
   stopCamera
 );
 
+
 modelSelector.addEventListener(
   "change",
   event => {
 
-    changeModel(
-      event.target.value
-    );
+    sceneMode =
+      event.target.value;
+
+
+    updateSceneModeDebug();
+
+
+    clearError();
+
+
+    if (
+      cameraRunning
+    ) {
+
+      setStatus(
+        `Scene mode: ${sceneMode}`
+      );
+
+    } else {
+
+      setStatus(
+        "Ready — Start Camera"
+      );
+    }
   }
 );
+
 
 video.addEventListener(
   "loadedmetadata",
@@ -3663,6 +4197,7 @@ video.addEventListener(
     resizeThree();
   }
 );
+
 
 window.addEventListener(
   "resize",
@@ -3680,8 +4215,9 @@ window.addEventListener(
 ========================================================= */
 
 console.log(
-  "[Human AR] Milestone 8.5 — fixed shoulder build"
+  "[Human AR] Milestone 8.6A — Dual Model Scene"
 );
+
 
 startButton.disabled =
   true;
@@ -3695,13 +4231,18 @@ captureButton.disabled =
 stopButton.disabled =
   true;
 
-initializeModelSelector();
+modelSelector.disabled =
+  true;
+
+
+initializeSceneSelector();
+
 
 try {
 
   initializeThree();
 
-  loadActiveModel();
+  loadAllModels();
 
 } catch (error) {
 
@@ -3709,9 +4250,11 @@ try {
     error
   );
 
+
   setStatus(
     "Three.js initialization failed"
   );
 }
+
 
 initializeMediaPipe();

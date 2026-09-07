@@ -276,6 +276,15 @@ const LANDMARK = {
    ORBIT CONSTANTS
 ========================================================= */
 
+const POSITION_SMOOTHING =
+  10;
+
+const SCALE_SMOOTHING =
+  8;
+
+const ROTATION_SMOOTHING =
+  8;
+
 const ORBIT_SPEED =
   1.6;
 
@@ -440,6 +449,46 @@ function damp(
   );
 }
 
+function dampAngle(
+  current,
+  target,
+  lambda,
+  delta
+) {
+
+  let difference =
+    target -
+    current;
+
+
+  while (
+    difference >
+    Math.PI
+  ) {
+
+    difference -=
+      Math.PI * 2;
+  }
+
+
+  while (
+    difference <
+    -Math.PI
+  ) {
+
+    difference +=
+      Math.PI * 2;
+  }
+
+
+  return damp(
+    current,
+    current + difference,
+    lambda,
+    delta
+  );
+}
+
 
 function setError(
   error
@@ -474,7 +523,7 @@ function effectIsEnabled(
 
   return Boolean(
     enabledEffects[
-      modelId
+    modelId
     ]
   );
 }
@@ -755,27 +804,27 @@ function updateTrackedBody(
 
   const leftShoulder =
     landmarks[
-      LANDMARK.LEFT_SHOULDER
+    LANDMARK.LEFT_SHOULDER
     ];
 
   const rightShoulder =
     landmarks[
-      LANDMARK.RIGHT_SHOULDER
+    LANDMARK.RIGHT_SHOULDER
     ];
 
   const leftHip =
     landmarks[
-      LANDMARK.LEFT_HIP
+    LANDMARK.LEFT_HIP
     ];
 
   const rightHip =
     landmarks[
-      LANDMARK.RIGHT_HIP
+    LANDMARK.RIGHT_HIP
     ];
 
   const nose =
     landmarks[
-      LANDMARK.NOSE
+    LANDMARK.NOSE
     ];
 
 
@@ -1189,7 +1238,7 @@ async function startCamera() {
 
     cameraStatus.textContent =
       facingMode ===
-      "user"
+        "user"
         ? "Running — Front"
         : "Running — Rear";
 
@@ -1217,7 +1266,7 @@ async function startCamera() {
       );
 
   } catch (
-    error
+  error
   ) {
 
     cameraRunning =
@@ -1344,7 +1393,7 @@ async function switchCamera() {
 
   facingMode =
     facingMode ===
-    "user"
+      "user"
       ? "environment"
       : "user";
 
@@ -1765,8 +1814,8 @@ function createModelInstance(
         )
           ? object.material
           : [
-              object.material
-            ];
+            object.material
+          ];
 
 
       for (
@@ -1950,7 +1999,7 @@ function createModelInstance(
     if (
       requestedIndex < 0 ||
       requestedIndex >=
-        animations.length
+      animations.length
     ) {
 
       throw new Error(
@@ -1961,7 +2010,7 @@ function createModelInstance(
 
     const clip =
       animations[
-        requestedIndex
+      requestedIndex
       ];
 
 
@@ -2085,7 +2134,7 @@ async function loadAllModels() {
     clearError();
 
   } catch (
-    error
+  error
   ) {
 
     allModelsReady =
@@ -2372,8 +2421,8 @@ function updateEffectDebug() {
   effectStatus.textContent =
     active.length > 0
       ? active.join(
-          " + "
-        )
+        " + "
+      )
       : "None";
 }
 
@@ -2559,7 +2608,7 @@ async function initializeMediaPipe() {
     clearError();
 
   } catch (
-    error
+  error
   ) {
 
     poseStatus.textContent =
@@ -2642,14 +2691,14 @@ function drawPoseDebug(
     const start =
       mapLandmarkToScreen(
         landmarks[
-          startIndex
+        startIndex
         ]
       );
 
     const end =
       mapLandmarkToScreen(
         landmarks[
-          endIndex
+        endIndex
         ]
       );
 
@@ -2708,7 +2757,7 @@ function drawPoseDebug(
     const point =
       mapLandmarkToScreen(
         landmarks[
-          index
+        index
         ]
       );
 
@@ -2823,30 +2872,30 @@ function buildHumanOcclusionLayer() {
 
     const confidence =
       maskData[
-        i
+      i
       ];
 
 
     const alpha =
       confidence <=
-      SEGMENTATION_LOW_THRESHOLD
+        SEGMENTATION_LOW_THRESHOLD
         ? 0
         : confidence >=
           SEGMENTATION_HIGH_THRESHOLD
           ? 255
           : Math.round(
+            (
               (
-                (
-                  confidence -
-                  SEGMENTATION_LOW_THRESHOLD
-                ) /
-                (
-                  SEGMENTATION_HIGH_THRESHOLD -
-                  SEGMENTATION_LOW_THRESHOLD
-                )
-              ) *
-              255
-            );
+                confidence -
+                SEGMENTATION_LOW_THRESHOLD
+              ) /
+              (
+                SEGMENTATION_HIGH_THRESHOLD -
+                SEGMENTATION_LOW_THRESHOLD
+              )
+            ) *
+            255
+          );
 
 
     const offset =
@@ -3079,7 +3128,7 @@ function modelNeedsHumanOcclusion(
 
 
   switch (
-    config.behavior
+  config.behavior
   ) {
 
     case "ORBIT":
@@ -3468,7 +3517,7 @@ function updateShoulderBehavior(
 
   const requestedSide =
     shoulderConfig.side ===
-    "left"
+      "left"
       ? "left"
       : "right";
 
@@ -3952,7 +4001,7 @@ function updateBesideBehavior(
 
   const side =
     beside.side ===
-    "left"
+      "left"
       ? -1
       : 1;
 
@@ -4127,7 +4176,7 @@ function updateAllModelBehaviors(
 
 
     switch (
-      config.behavior
+    config.behavior
     ) {
 
       case "ORBIT":
@@ -4221,7 +4270,1141 @@ function updateAllModelBehaviors(
   anchorStatus.textContent =
     debug.length > 0
       ? debug.join(
-          " | "
-        )
+        " | "
+      )
       : "No effects";
+}
+
+/* =========================================================
+   STAR INITIALIZATION
+========================================================= */
+
+function initializeStars() {
+
+  starParticles.length =
+    0;
+
+
+  for (
+    let i = 0;
+    i < STAR_COUNT;
+    i++
+  ) {
+
+    const angle =
+      (
+        i /
+        STAR_COUNT
+      ) *
+      Math.PI *
+      2;
+
+
+    starParticles.push({
+
+      angle,
+
+      speed:
+        0.25 +
+        Math.random() *
+        0.25,
+
+      radiusMultiplier:
+        0.85 +
+        Math.random() *
+        0.55,
+
+      sizeMultiplier:
+        0.7 +
+        Math.random() *
+        0.6,
+
+      phase:
+        Math.random() *
+        Math.PI *
+        2
+    });
+  }
+}
+
+
+/* =========================================================
+   DRAW STAR SHAPE
+========================================================= */
+
+function drawStarShape(
+  context,
+  x,
+  y,
+  outerRadius,
+  innerRadius,
+  rotation = 0
+) {
+
+  const points =
+    5;
+
+
+  context.beginPath();
+
+
+  for (
+    let i = 0;
+    i <
+    points * 2;
+    i++
+  ) {
+
+    const radius =
+      i % 2 === 0
+        ? outerRadius
+        : innerRadius;
+
+
+    const angle =
+      rotation +
+      (
+        i *
+        Math.PI /
+        points
+      ) -
+      Math.PI / 2;
+
+
+    const px =
+      x +
+      Math.cos(
+        angle
+      ) *
+      radius;
+
+
+    const py =
+      y +
+      Math.sin(
+        angle
+      ) *
+      radius;
+
+
+    if (
+      i === 0
+    ) {
+
+      context.moveTo(
+        px,
+        py
+      );
+
+    } else {
+
+      context.lineTo(
+        px,
+        py
+      );
+    }
+  }
+
+
+  context.closePath();
+
+  context.fill();
+}
+
+
+/* =========================================================
+   DRAW STARS EFFECT
+========================================================= */
+
+function drawStarsEffect(
+  timestamp
+) {
+
+  clearEffectOverlay();
+
+
+  if (
+    !enabledEffects.stars ||
+    !trackedBody.valid
+  ) {
+
+    return;
+  }
+
+
+  if (
+    starParticles.length ===
+    0
+  ) {
+
+    initializeStars();
+  }
+
+
+  const width =
+    effectOverlay.width;
+
+  const height =
+    effectOverlay.height;
+
+
+  if (
+    !width ||
+    !height
+  ) {
+
+    return;
+  }
+
+
+  const centerX =
+    trackedBody.centerX *
+    width;
+
+
+  const centerY =
+    (
+      trackedBody.centerY -
+      trackedBody.torsoHeight *
+      0.05
+    ) *
+    height;
+
+
+  const bodyWidth =
+    trackedBody.shoulderWidth *
+    width;
+
+
+  const bodyHeight =
+    trackedBody.torsoHeight *
+    height;
+
+
+  effectCtx.save();
+
+
+  effectCtx.fillStyle =
+    "rgba(255,255,255,0.95)";
+
+
+  for (
+    const star
+    of starParticles
+  ) {
+
+    const time =
+      timestamp *
+      0.001;
+
+
+    const currentAngle =
+      star.angle +
+      time *
+      star.speed;
+
+
+    const radiusX =
+      bodyWidth *
+      1.3 *
+      star.radiusMultiplier;
+
+
+    const radiusY =
+      bodyHeight *
+      0.75 *
+      star.radiusMultiplier;
+
+
+    const pulse =
+      1 +
+      Math.sin(
+        time *
+        2.5 +
+        star.phase
+      ) *
+      0.12;
+
+
+    const x =
+      centerX +
+      Math.cos(
+        currentAngle
+      ) *
+      radiusX;
+
+
+    const y =
+      centerY +
+      Math.sin(
+        currentAngle *
+        1.15
+      ) *
+      radiusY;
+
+
+    const size =
+      Math.max(
+        3,
+        bodyWidth *
+        0.055 *
+        star.sizeMultiplier *
+        pulse
+      );
+
+
+    drawStarShape(
+      effectCtx,
+      x,
+      y,
+      size,
+      size *
+      0.45,
+      currentAngle
+    );
+  }
+
+
+  effectCtx.restore();
+}
+
+
+/* =========================================================
+   SEGMENTATION UPDATE
+========================================================= */
+
+function updateSegmentation(
+  timestamp
+) {
+
+  if (
+    !imageSegmenter ||
+    !cameraRunning ||
+    video.readyState <
+    2
+  ) {
+
+    return;
+  }
+
+
+  if (
+    timestamp -
+    latestSegmentationTimestamp <
+    SEGMENTATION_INTERVAL
+  ) {
+
+    return;
+  }
+
+
+  latestSegmentationTimestamp =
+    timestamp;
+
+
+  try {
+
+    imageSegmenter.segmentForVideo(
+
+      video,
+
+      timestamp,
+
+      result => {
+
+        if (
+          !result ||
+          !result.confidenceMasks ||
+          result.confidenceMasks.length ===
+          0
+        ) {
+
+          segmentationStatus.textContent =
+            "No Mask";
+
+
+          return;
+        }
+
+
+        if (
+          latestSegmentationMask &&
+          latestSegmentationMask.close
+        ) {
+
+          latestSegmentationMask.close();
+        }
+
+
+        latestSegmentationMask =
+          result.confidenceMasks[
+          0
+          ];
+
+
+        segmentationStatus.textContent =
+          "Human Mask";
+      }
+    );
+
+  } catch (
+  error
+  ) {
+
+    segmentationStatus.textContent =
+      "Error";
+
+
+    console.warn(
+      "[Human AR] segmentation:",
+      error
+    );
+  }
+}
+
+
+/* =========================================================
+   DRAW OVERLAY
+========================================================= */
+
+function drawOverlay() {
+
+  clearOverlay();
+
+
+  if (
+    !cameraRunning
+  ) {
+
+    return;
+  }
+
+
+  /*
+   * IMPORTANT:
+   *
+   * The human cutout is drawn first.
+   * Pose debug is drawn after it so that
+   * the green debug skeleton stays visible.
+   */
+
+  drawFullHumanOcclusion();
+
+
+  if (
+    latestLandmarks
+  ) {
+
+    drawPoseDebug(
+      latestLandmarks
+    );
+  }
+}
+
+
+/* =========================================================
+   MODEL LAYER ROUTING
+
+   BACK RENDERER:
+   Models currently requiring HUMAN occlusion.
+
+   FRONT RENDERER:
+   Models that should stay above the human cutout.
+
+   Example:
+   Butterfly BACK -> back renderer
+   Butterfly EDGE/FRONT -> front renderer
+   Waveboy -> front renderer
+========================================================= */
+
+function renderModelLayers() {
+
+  if (
+    !renderer ||
+    !frontRenderer ||
+    !scene ||
+    !threeCamera
+  ) {
+
+    return;
+  }
+
+
+  const originalVisibility =
+    new Map();
+
+
+  /*
+   * Save the real visibility state produced
+   * by each behavior before temporarily
+   * changing visibility for the two passes.
+   */
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    originalVisibility.set(
+      instance.config.id,
+      instance.anchor.visible
+    );
+  }
+
+
+  /* ---------------------------------------------------------
+     BACK PASS
+  --------------------------------------------------------- */
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    const wasVisible =
+      originalVisibility.get(
+        instance.config.id
+      );
+
+
+    instance.anchor.visible =
+      Boolean(
+        wasVisible &&
+        modelNeedsHumanOcclusion(
+          instance
+        )
+      );
+  }
+
+
+  renderer.render(
+    scene,
+    threeCamera
+  );
+
+
+  /* ---------------------------------------------------------
+     FRONT PASS
+  --------------------------------------------------------- */
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    const wasVisible =
+      originalVisibility.get(
+        instance.config.id
+      );
+
+
+    instance.anchor.visible =
+      Boolean(
+        wasVisible &&
+        !modelNeedsHumanOcclusion(
+          instance
+        )
+      );
+  }
+
+
+  frontRenderer.render(
+    scene,
+    threeCamera
+  );
+
+
+  /* ---------------------------------------------------------
+     RESTORE REAL MODEL VISIBILITY
+  --------------------------------------------------------- */
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    instance.anchor.visible =
+      Boolean(
+        originalVisibility.get(
+          instance.config.id
+        )
+      );
+  }
+}
+
+
+/* =========================================================
+   POSE RESULT
+========================================================= */
+
+function processPoseResult(
+  result
+) {
+
+  if (
+    !result ||
+    !result.landmarks ||
+    result.landmarks.length ===
+    0
+  ) {
+
+    latestLandmarks =
+      null;
+
+
+    trackedBody.valid =
+      false;
+
+
+    poseStatus.textContent =
+      "No Person";
+
+
+    hideAllModels();
+
+
+    return;
+  }
+
+
+  latestLandmarks =
+    result.landmarks[
+    0
+    ];
+
+
+  updateTrackedBody(
+    latestLandmarks
+  );
+
+
+  if (
+    trackedBody.valid
+  ) {
+
+    poseStatus.textContent =
+      "Person Found";
+
+  } else {
+
+    poseStatus.textContent =
+      "Pose Unstable";
+  }
+}
+
+
+/* =========================================================
+   MAIN LOOP
+========================================================= */
+
+function predictPose() {
+
+  if (
+    !cameraRunning
+  ) {
+
+    return;
+  }
+
+
+  animationFrameId =
+    requestAnimationFrame(
+      predictPose
+    );
+
+
+  const now =
+    performance.now();
+
+
+  const delta =
+    Math.min(
+      (
+        now -
+        lastFrameTimestamp
+      ) /
+      1000,
+
+      0.1
+    );
+
+
+  lastFrameTimestamp =
+    now;
+
+
+  resizeOverlay();
+
+
+  if (
+    video.readyState <
+    2
+  ) {
+
+    return;
+  }
+
+
+  /*
+   * Run pose only when a new camera frame exists.
+   */
+
+  if (
+    video.currentTime !==
+    lastVideoTime
+  ) {
+
+    lastVideoTime =
+      video.currentTime;
+
+
+    if (
+      poseLandmarker
+    ) {
+
+      try {
+
+        const result =
+          poseLandmarker.detectForVideo(
+            video,
+            now
+          );
+
+
+        processPoseResult(
+          result
+        );
+
+      } catch (
+      error
+      ) {
+
+        console.warn(
+          "[Human AR] pose:",
+          error
+        );
+      }
+    }
+
+
+    updateSegmentation(
+      now
+    );
+  }
+
+
+  /*
+   * Model animations continue every render frame.
+   */
+
+  updateModelAnimations(
+    delta
+  );
+
+
+  /*
+   * Body-relative behavior update.
+   */
+
+  updateAllModelBehaviors(
+    delta
+  );
+
+
+  updateEffectVisibility();
+
+
+  /*
+   * Render the GLBs into their appropriate
+   * BACK or FRONT canvas.
+   */
+
+  renderModelLayers();
+
+
+  /*
+   * BODY_EFFECT layer.
+   */
+
+  drawStarsEffect(
+    now
+  );
+
+
+  /*
+   * Human occlusion + pose debug.
+   */
+
+  drawOverlay();
+}
+
+
+/* =========================================================
+   CAPTURE CAMERA FRAME
+========================================================= */
+
+function drawCameraToCapture(
+  width,
+  height
+) {
+
+  const transform =
+    getVideoTransform();
+
+
+  if (
+    !transform
+  ) {
+
+    return false;
+  }
+
+
+  captureCtx.save();
+
+
+  captureCtx.clearRect(
+    0,
+    0,
+    width,
+    height
+  );
+
+
+  /*
+   * Match the mirrored front-camera preview.
+   */
+
+  if (
+    facingMode ===
+    "user"
+  ) {
+
+    captureCtx.translate(
+      width,
+      0
+    );
+
+
+    captureCtx.scale(
+      -1,
+      1
+    );
+  }
+
+
+  captureCtx.drawImage(
+
+    video,
+
+    0,
+    0,
+
+    video.videoWidth,
+    video.videoHeight,
+
+    facingMode ===
+      "user"
+      ? -transform.offsetX -
+      transform.renderedWidth +
+      width
+      : transform.offsetX,
+
+    transform.offsetY,
+
+    transform.renderedWidth,
+    transform.renderedHeight
+  );
+
+
+  captureCtx.restore();
+
+
+  return true;
+}
+
+
+/* =========================================================
+   CAPTURE HUMAN OCCLUSION
+========================================================= */
+
+function drawHumanOcclusionToCapture() {
+
+  if (
+    !shouldUseHumanOcclusion()
+  ) {
+
+    return;
+  }
+
+
+  if (
+    !buildHumanOcclusionLayer()
+  ) {
+
+    return;
+  }
+
+
+  captureCtx.drawImage(
+    compositeCanvas,
+    0,
+    0,
+
+    captureCanvas.width,
+    captureCanvas.height
+  );
+}
+
+
+/* =========================================================
+   CAPTURE PHOTO
+========================================================= */
+
+function capturePhoto() {
+
+  try {
+
+    clearError();
+
+
+    if (
+      !cameraRunning ||
+      !systemReady() ||
+      video.readyState <
+      2
+    ) {
+
+      captureStatus.textContent =
+        "Not Ready";
+
+
+      return;
+    }
+
+
+    const width =
+      overlay.width;
+
+
+    const height =
+      overlay.height;
+
+
+    if (
+      !width ||
+      !height
+    ) {
+
+      captureStatus.textContent =
+        "Invalid Size";
+
+
+      return;
+    }
+
+
+    captureCanvas.width =
+      width;
+
+
+    captureCanvas.height =
+      height;
+
+
+    /*
+     * Refresh both model render passes immediately
+     * before capture.
+     */
+
+    renderModelLayers();
+
+
+    /* -------------------------------------------------------
+       1. CAMERA
+    ------------------------------------------------------- */
+
+    if (
+      !drawCameraToCapture(
+        width,
+        height
+      )
+    ) {
+
+      captureStatus.textContent =
+        "Camera Failed";
+
+
+      return;
+    }
+
+
+    /* -------------------------------------------------------
+       2. BACK GLB LAYER
+
+       Butterfly is here only while it is actually BACK.
+    ------------------------------------------------------- */
+
+    captureCtx.drawImage(
+      renderer.domElement,
+
+      0,
+      0,
+
+      width,
+      height
+    );
+
+
+    /* -------------------------------------------------------
+       3. HUMAN CUTOUT
+
+       This covers only the BACK model pass.
+    ------------------------------------------------------- */
+
+    drawHumanOcclusionToCapture();
+
+
+    /* -------------------------------------------------------
+       4. STARS
+
+       BODY_EFFECT currently remains above the human cutout
+       in the exported photo.
+    ------------------------------------------------------- */
+
+    if (
+      enabledEffects.stars
+    ) {
+
+      captureCtx.drawImage(
+        effectOverlay,
+
+        0,
+        0,
+
+        width,
+        height
+      );
+    }
+
+
+    /* -------------------------------------------------------
+       5. FRONT GLB LAYER
+
+       Waveboy and Butterfly FRONT/EDGE are here.
+    ------------------------------------------------------- */
+
+    captureCtx.drawImage(
+      frontRenderer.domElement,
+
+      0,
+      0,
+
+      width,
+      height
+    );
+
+
+    /*
+     * Pose debug is intentionally NOT captured.
+     */
+
+
+    captureStatus.textContent =
+      "Captured";
+
+
+    const effectName =
+      getCaptureEffectName();
+
+
+    const timestamp =
+      new Date()
+        .toISOString()
+        .replace(
+          /[:.]/g,
+          "-"
+        );
+
+
+    const filename =
+      `human-ar-${effectName}-${timestamp}.jpg`;
+
+
+    captureCanvas.toBlob(
+
+      blob => {
+
+        if (
+          !blob
+        ) {
+
+          captureStatus.textContent =
+            "Capture Failed";
+
+
+          return;
+        }
+
+
+        const url =
+          URL.createObjectURL(
+            blob
+          );
+
+
+        const link =
+          document.createElement(
+            "a"
+          );
+
+
+        link.href =
+          url;
+
+
+        link.download =
+          filename;
+
+
+        document.body.appendChild(
+          link
+        );
+
+
+        link.click();
+
+
+        link.remove();
+
+
+        setTimeout(
+          () => {
+
+            URL.revokeObjectURL(
+              url
+            );
+          },
+
+          1000
+        );
+      },
+
+      "image/jpeg",
+
+      0.95
+    );
+
+  } catch (
+  error
+  ) {
+
+    captureStatus.textContent =
+      "Capture Error";
+
+
+    setError(
+      error
+    );
+  }
 }

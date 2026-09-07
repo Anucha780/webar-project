@@ -665,6 +665,12 @@ const ORBIT_RADIUS_X =
 const ORBIT_RADIUS_Y =
   0.38;
 
+const ORBIT_BACK_WIDTH_BOOST = 
+  0.28;
+
+const ORBIT_BACK_LIFT = 
+  0.18;
+
 const ORBIT_CENTER_Y =
   0.12;
 
@@ -3553,7 +3559,7 @@ function updateOrbitBehavior(
     );
 
 
-  orbitDepth =
+  const orbitDepth =
     Math.sin(
       orbitAngle
     );

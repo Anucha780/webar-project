@@ -292,7 +292,7 @@ const ORBIT_RADIUS_Y =
   0.38;
 
 const ORBIT_CENTER_Y =
-  0.12;
+  0.28;
 
 const ORBIT_DEPTH_SCALE =
   0.25;
@@ -2734,84 +2734,60 @@ function buildHumanOcclusionLayer() {
   maskCtx.restore();
 
   compositeCtx.clearRect(
-    0,
-    0,
+  0,
+  0,
+  width,
+  height
+);
+
+compositeCtx.save();
+
+if (
+  facingMode ===
+  "user"
+) {
+  compositeCtx.translate(
     width,
-    height
-  );
-
-  compositeCtx.save();
-
-  compositeCtx.drawImage(
-    video,
-
-    0,
-    0,
-
-    video.videoWidth,
-    video.videoHeight,
-
-    transform.offsetX,
-    transform.offsetY,
-
-    transform.renderedWidth,
-    transform.renderedHeight
-  );
-
-  if (
-    facingMode ===
-    "user"
-  ) {
-
-    const image =
-      compositeCtx.getImageData(
-        0,
-        0,
-        width,
-        height
-      );
-
-    compositeCtx.clearRect(
-      0,
-      0,
-      width,
-      height
-    );
-
-    compositeCtx.save();
-
-    compositeCtx.translate(
-      width,
-      0
-    );
-
-    compositeCtx.scale(
-      -1,
-      1
-    );
-
-    compositeCtx.putImageData(
-      image,
-      0,
-      0
-    );
-
-    compositeCtx.restore();
-  }
-
-  compositeCtx.globalCompositeOperation =
-    "destination-in";
-
-  compositeCtx.drawImage(
-    maskCanvas,
-    0,
     0
   );
 
-  compositeCtx.globalCompositeOperation =
-    "source-over";
+  compositeCtx.scale(
+    -1,
+    1
+  );
+}
 
-  return true;
+compositeCtx.drawImage(
+  video,
+
+  0,
+  0,
+
+  video.videoWidth,
+  video.videoHeight,
+
+  transform.offsetX,
+  transform.offsetY,
+
+  transform.renderedWidth,
+  transform.renderedHeight
+);
+
+compositeCtx.restore();
+
+compositeCtx.globalCompositeOperation =
+  "destination-in";
+
+compositeCtx.drawImage(
+  maskCanvas,
+  0,
+  0
+);
+
+compositeCtx.globalCompositeOperation =
+  "source-over";
+
+return true;
 }
 
 /* =========================================================
@@ -3022,9 +2998,8 @@ function updateOrbitBehavior(
     trackedBody.centerY +
     centerYOffset +
     orbitY *
-    radiusY -
-    backLift;
-
+    radiusY;
+ 
   /* ---------------------------------------------------------
      BODY-RELATIVE SCALE
   --------------------------------------------------------- */

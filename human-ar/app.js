@@ -3467,7 +3467,7 @@ function modelNeedsHumanOcclusion(
     case "ORBIT":
 
       return (
-        orbitDepth < 0
+        orbitDepth <  -0.35
       );
 
 

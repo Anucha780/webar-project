@@ -3537,6 +3537,10 @@ function updateOrbitBehavior(
   const config =
     instance.config;
 
+  
+  const ORBIT_BACK_WIDTH_BOOST = 0.28;
+  const ORBIT_BACK_LIFT = 0.18;
+
 
   orbitAngle +=
     ORBIT_SPEED *
@@ -3563,7 +3567,25 @@ function updateOrbitBehavior(
     Math.sin(
       orbitAngle
     );
+  
+  const backAmount =
+  Math.max(
+    0,
+    -orbitDepth
+  );
 
+
+const orbitWidth =
+  ORBIT_RADIUS_X +
+  (
+    backAmount *
+    ORBIT_BACK_WIDTH_BOOST
+  );
+
+
+const backLift =
+  backAmount *
+  ORBIT_BACK_LIFT;
 
   const orbitY =
     Math.sin(
@@ -3572,8 +3594,14 @@ function updateOrbitBehavior(
 
 
   const radiusX =
-    trackedBody.shoulderWidth *
-    ORBIT_RADIUS_X;
+  trackedBody.shoulderWidth *
+  (
+    ORBIT_RADIUS_X +
+    (
+      backAmount *
+      ORBIT_BACK_WIDTH_BOOST
+    )
+  );
 
 
   const radiusY =

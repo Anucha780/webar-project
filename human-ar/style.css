@@ -73,6 +73,10 @@ a {
   background: #000;
 }
 
+#camera.mirrored {
+  transform: scaleX(-1);
+}
+
 #three-front-layer {
   display: none;
 

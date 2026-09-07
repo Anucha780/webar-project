@@ -19,7 +19,6 @@ import {
   normalizeModelConfig
 } from "./models.js";
 
-
 /* =========================================================
    DOM
 ========================================================= */
@@ -83,7 +82,6 @@ const modelToggleContainer =
 
 const modelToggleElements =
   new Map();
-
 
 /* =========================================================
    DEBUG UI
@@ -160,7 +158,6 @@ let lastFrameTimestamp =
 let lastVideoTime =
   -1;
 
-
 /* =========================================================
    MEDIAPIPE STATE
 ========================================================= */
@@ -180,7 +177,6 @@ let latestSegmentationMask =
 let latestSegmentationTimestamp =
   0;
 
-
 /* =========================================================
    THREE STATE
 ========================================================= */
@@ -199,7 +195,6 @@ const modelInstances =
 let allModelsReady =
   false;
 
-
 /* =========================================================
    ORBIT STATE
 ========================================================= */
@@ -209,7 +204,6 @@ let orbitAngle =
 
 let orbitDepth =
   0;
-
 
 /* =========================================================
    EFFECT STATE
@@ -236,7 +230,6 @@ const enabledEffects =
 enabledEffects.stars =
   true;
 
-
 /* =========================================================
    TRACKED BODY
 ========================================================= */
@@ -261,7 +254,6 @@ const trackedBody = {
   headY: 0.25
 };
 
-
 /* =========================================================
    LANDMARK CONSTANTS
 ========================================================= */
@@ -276,7 +268,6 @@ const LANDMARK = {
   LEFT_HIP: 23,
   RIGHT_HIP: 24
 };
-
 
 /* =========================================================
    ORBIT CONSTANTS
@@ -321,7 +312,6 @@ const ORBIT_EDGE_THRESHOLD =
 const FOLLOW_ORBIT_DIRECTION =
   true;
 
-
 /* =========================================================
    SEGMENTATION CONSTANTS
 ========================================================= */
@@ -340,7 +330,6 @@ const SEGMENTATION_EXPANSION =
 
 const SEGMENTATION_TEMPORAL_ALPHA =
   0.70;
-
 
 /* =========================================================
    TEMP CANVASES
@@ -376,7 +365,6 @@ const maskCtx =
     "2d"
   );
 
-
 /* =========================================================
    CAPTURE CANVAS
 ========================================================= */
@@ -391,7 +379,6 @@ const captureCtx =
     "2d"
   );
 
-
 /* =========================================================
    STARS
 ========================================================= */
@@ -401,7 +388,6 @@ const starParticles =
 
 const STAR_COUNT =
   14;
-
 
 /* =========================================================
    BASIC HELPERS
@@ -422,7 +408,6 @@ function clamp(
   );
 }
 
-
 function lerp(
   start,
   end,
@@ -438,7 +423,6 @@ function lerp(
     amount
   );
 }
-
 
 function damp(
   current,
@@ -466,7 +450,6 @@ function dampAngle(
     target -
     current;
 
-
   while (
     difference >
     Math.PI
@@ -475,7 +458,6 @@ function dampAngle(
     difference -=
       Math.PI * 2;
   }
-
 
   while (
     difference <
@@ -486,7 +468,6 @@ function dampAngle(
       Math.PI * 2;
   }
 
-
   return damp(
     current,
     current + difference,
@@ -494,7 +475,6 @@ function dampAngle(
     delta
   );
 }
-
 
 function setError(
   error
@@ -511,13 +491,11 @@ function setError(
     );
 }
 
-
 function clearError() {
 
   errorStatus.textContent =
     "None";
 }
-
 
 /* =========================================================
    EFFECT HELPERS
@@ -534,14 +512,12 @@ function effectIsEnabled(
   );
 }
 
-
 function createModelToggles() {
 
   modelToggleElements.clear();
 
   modelToggleContainer.innerHTML =
     "";
-
 
   const configs =
     MODEL_REGISTRY
@@ -564,7 +540,6 @@ function createModelToggles() {
           b.ui.order
       );
 
-
   for (
     const config
     of configs
@@ -580,7 +555,6 @@ function createModelToggles() {
         "input"
       );
 
-
     toggleElement.type =
       "checkbox";
 
@@ -592,7 +566,6 @@ function createModelToggles() {
         config.id
       );
 
-
     label.appendChild(
       toggleElement
     );
@@ -600,7 +573,6 @@ function createModelToggles() {
     label.append(
       ` ${config.ui.label}`
     );
-
 
     modelToggleContainer.appendChild(
       label
@@ -613,7 +585,6 @@ function createModelToggles() {
   }
 }
 
-
 /* =========================================================
    BODY / SCREEN COORDINATES
 ========================================================= */
@@ -623,13 +594,11 @@ function getVideoTransform() {
   const videoRect =
     video.getBoundingClientRect();
 
-
   const sourceWidth =
     video.videoWidth;
 
   const sourceHeight =
     video.videoHeight;
-
 
   if (
     !sourceWidth ||
@@ -641,7 +610,6 @@ function getVideoTransform() {
     return null;
   }
 
-
   const sourceAspect =
     sourceWidth /
     sourceHeight;
@@ -650,12 +618,10 @@ function getVideoTransform() {
     videoRect.width /
     videoRect.height;
 
-
   let renderedWidth;
   let renderedHeight;
   let offsetX;
   let offsetY;
-
 
   if (
     sourceAspect >
@@ -699,7 +665,6 @@ function getVideoTransform() {
       2;
   }
 
-
   return {
 
     videoRect,
@@ -712,14 +677,12 @@ function getVideoTransform() {
   };
 }
 
-
 function mapLandmarkToScreen(
   landmark
 ) {
 
   const transform =
     getVideoTransform();
-
 
   if (
     !transform
@@ -728,10 +691,8 @@ function mapLandmarkToScreen(
     return null;
   }
 
-
   let normalizedX =
     landmark.x;
-
 
   if (
     facingMode ===
@@ -743,7 +704,6 @@ function mapLandmarkToScreen(
       normalizedX;
   }
 
-
   const x =
     (
       transform.offsetX +
@@ -751,7 +711,6 @@ function mapLandmarkToScreen(
       transform.renderedWidth
     ) /
     transform.videoRect.width;
-
 
   const y =
     (
@@ -761,13 +720,11 @@ function mapLandmarkToScreen(
     ) /
     transform.videoRect.height;
 
-
   return {
     x,
     y
   };
 }
-
 
 function landmarkReliable(
   landmark
@@ -780,16 +737,13 @@ function landmarkReliable(
     return false;
   }
 
-
   const visibility =
     landmark.visibility ??
     1;
 
-
   const presence =
     landmark.presence ??
     1;
-
 
   return (
     visibility >=
@@ -798,7 +752,6 @@ function landmarkReliable(
     0.45
   );
 }
-
 
 /* =========================================================
    UPDATE TRACKED BODY
@@ -833,7 +786,6 @@ function updateTrackedBody(
     LANDMARK.NOSE
     ];
 
-
   if (
     !landmarkReliable(
       leftShoulder
@@ -855,7 +807,6 @@ function updateTrackedBody(
     return;
   }
 
-
   const leftShoulderPoint =
     mapLandmarkToScreen(
       leftShoulder
@@ -876,7 +827,6 @@ function updateTrackedBody(
       rightHip
     );
 
-
   if (
     !leftShoulderPoint ||
     !rightShoulderPoint ||
@@ -889,7 +839,6 @@ function updateTrackedBody(
 
     return;
   }
-
 
   const shoulderCenterX =
     (
@@ -905,7 +854,6 @@ function updateTrackedBody(
     ) /
     2;
 
-
   const hipCenterX =
     (
       leftHipPoint.x +
@@ -919,7 +867,6 @@ function updateTrackedBody(
       rightHipPoint.y
     ) /
     2;
-
 
   trackedBody.centerX =
     (
@@ -935,20 +882,17 @@ function updateTrackedBody(
     ) /
     2;
 
-
   trackedBody.shoulderWidth =
     Math.abs(
       rightShoulderPoint.x -
       leftShoulderPoint.x
     );
 
-
   trackedBody.torsoHeight =
     Math.abs(
       hipCenterY -
       shoulderCenterY
     );
-
 
   if (
     leftShoulderPoint.x <
@@ -982,7 +926,6 @@ function updateTrackedBody(
       leftShoulderPoint.y;
   }
 
-
   if (
     landmarkReliable(
       nose
@@ -993,7 +936,6 @@ function updateTrackedBody(
       mapLandmarkToScreen(
         nose
       );
-
 
     if (
       headPoint
@@ -1007,11 +949,9 @@ function updateTrackedBody(
     }
   }
 
-
   trackedBody.valid =
     true;
 }
-
 
 /* =========================================================
    CANVAS SIZE
@@ -1022,7 +962,6 @@ function resizeOverlay() {
   const rect =
     video.getBoundingClientRect();
 
-
   if (
     rect.width <= 0 ||
     rect.height <= 0
@@ -1030,7 +969,6 @@ function resizeOverlay() {
 
     return;
   }
-
 
   const width =
     Math.round(
@@ -1041,7 +979,6 @@ function resizeOverlay() {
     Math.round(
       rect.height
     );
-
 
   if (
     overlay.width !==
@@ -1056,7 +993,6 @@ function resizeOverlay() {
     overlay.height =
       height;
   }
-
 
   if (
     effectOverlay.width !==
@@ -1075,7 +1011,6 @@ function resizeOverlay() {
   }
 }
 
-
 /* =========================================================
    CLEAR OVERLAYS
 ========================================================= */
@@ -1090,7 +1025,6 @@ function clearOverlay() {
   );
 }
 
-
 function clearEffectOverlay() {
 
   effectCtx.clearRect(
@@ -1100,7 +1034,6 @@ function clearEffectOverlay() {
     effectOverlay.height
   );
 }
-
 
 /* =========================================================
    CAMERA SUPPORT
@@ -1121,11 +1054,9 @@ function stopMediaTracks() {
     }
   }
 
-
   stream =
     null;
 }
-
 
 function updateVideoMirror() {
 
@@ -1146,7 +1077,6 @@ function updateVideoMirror() {
   }
 }
 
-
 /* =========================================================
    CAMERA START
 ========================================================= */
@@ -1157,7 +1087,6 @@ async function startCamera() {
 
     clearError();
 
-
     if (
       cameraRunning
     ) {
@@ -1165,17 +1094,13 @@ async function startCamera() {
       return;
     }
 
-
     startButton.disabled =
       true;
-
 
     cameraStatus.textContent =
       "Starting...";
 
-
     stopMediaTracks();
-
 
     stream =
       await navigator.mediaDevices.getUserMedia({
@@ -1201,20 +1126,15 @@ async function startCamera() {
         }
       });
 
-
     video.srcObject =
       stream;
 
-
     await video.play();
-
 
     updateVideoMirror();
 
-
     cameraRunning =
       true;
-
 
     video.style.display =
       "block";
@@ -1231,7 +1151,6 @@ async function startCamera() {
     overlay.style.display =
       "block";
 
-
     stopButton.disabled =
       false;
 
@@ -1241,18 +1160,15 @@ async function startCamera() {
     captureButton.disabled =
       !systemReady();
 
-
     cameraStatus.textContent =
       facingMode ===
         "user"
         ? "Running — Front"
         : "Running — Rear";
 
-
     resizeOverlay();
 
     resizeThree();
-
 
     lastVideoTime =
       -1;
@@ -1260,11 +1176,9 @@ async function startCamera() {
     lastFrameTimestamp =
       performance.now();
 
-
     cancelAnimationFrame(
       animationFrameId
     );
-
 
     animationFrameId =
       requestAnimationFrame(
@@ -1293,13 +1207,11 @@ async function startCamera() {
     captureButton.disabled =
       true;
 
-
     setError(
       error
     );
   }
 }
-
 
 /* =========================================================
    CAMERA STOP
@@ -1309,7 +1221,6 @@ function stopStream() {
 
   cameraRunning =
     false;
-
 
   if (
     animationFrameId
@@ -1323,13 +1234,10 @@ function stopStream() {
       null;
   }
 
-
   stopMediaTracks();
-
 
   video.srcObject =
     null;
-
 
   video.style.display =
     "none";
@@ -1346,13 +1254,11 @@ function stopStream() {
   overlay.style.display =
     "none";
 
-
   clearOverlay();
 
   clearEffectOverlay();
 
   hideAllModels();
-
 
   latestLandmarks =
     null;
@@ -1362,7 +1268,6 @@ function stopStream() {
 
   trackedBody.valid =
     false;
-
 
   cameraStatus.textContent =
     "Stopped";
@@ -1375,7 +1280,6 @@ function stopStream() {
 
   anchorStatus.textContent =
     "Hidden";
-
 
   startButton.disabled =
     false;
@@ -1390,7 +1294,6 @@ function stopStream() {
     true;
 }
 
-
 /* =========================================================
    SWITCH CAMERA
 ========================================================= */
@@ -1403,7 +1306,6 @@ async function switchCamera() {
       ? "environment"
       : "user";
 
-
   if (
     !cameraRunning
   ) {
@@ -1413,12 +1315,10 @@ async function switchCamera() {
     return;
   }
 
-
   stopStream();
 
   await startCamera();
 }
-
 
 /* =========================================================
    THREE RESIZE
@@ -1435,10 +1335,8 @@ function resizeThree() {
     return;
   }
 
-
   const rect =
     threeLayer.getBoundingClientRect();
-
 
   if (
     rect.width <= 0 ||
@@ -1448,20 +1346,17 @@ function resizeThree() {
     return;
   }
 
-
   renderer.setSize(
     rect.width,
     rect.height,
     false
   );
 
-
   frontRenderer.setSize(
     rect.width,
     rect.height,
     false
   );
-
 
   threeCamera.left =
     0;
@@ -1475,10 +1370,8 @@ function resizeThree() {
   threeCamera.bottom =
     0;
 
-
   threeCamera.updateProjectionMatrix();
 }
-
 
 /* =========================================================
    THREE INITIALIZATION
@@ -1488,7 +1381,6 @@ function initializeThree() {
 
   scene =
     new THREE.Scene();
-
 
   threeCamera =
     new THREE.OrthographicCamera(
@@ -1500,10 +1392,8 @@ function initializeThree() {
       10
     );
 
-
   threeCamera.position.z =
     5;
-
 
   renderer =
     new THREE.WebGLRenderer({
@@ -1515,12 +1405,10 @@ function initializeThree() {
       preserveDrawingBuffer: true
     });
 
-
   renderer.setClearColor(
     0x000000,
     0
   );
-
 
   renderer.setPixelRatio(
     Math.min(
@@ -1530,15 +1418,12 @@ function initializeThree() {
     )
   );
 
-
   renderer.outputColorSpace =
     THREE.SRGBColorSpace;
-
 
   threeLayer.appendChild(
     renderer.domElement
   );
-
 
   frontRenderer =
     new THREE.WebGLRenderer({
@@ -1550,12 +1435,10 @@ function initializeThree() {
       preserveDrawingBuffer: true
     });
 
-
   frontRenderer.setClearColor(
     0x000000,
     0
   );
-
 
   frontRenderer.setPixelRatio(
     Math.min(
@@ -1565,15 +1448,12 @@ function initializeThree() {
     )
   );
 
-
   frontRenderer.outputColorSpace =
     THREE.SRGBColorSpace;
-
 
   frontThreeLayer.appendChild(
     frontRenderer.domElement
   );
-
 
   const ambient =
     new THREE.AmbientLight(
@@ -1581,11 +1461,9 @@ function initializeThree() {
       2.2
     );
 
-
   scene.add(
     ambient
   );
-
 
   const directional =
     new THREE.DirectionalLight(
@@ -1593,33 +1471,27 @@ function initializeThree() {
       2.5
     );
 
-
   directional.position.set(
     1,
     2,
     4
   );
 
-
   scene.add(
     directional
   );
 
-
   resizeThree();
-
 
   renderer.render(
     scene,
     threeCamera
   );
 
-
   frontRenderer.render(
     scene,
     threeCamera
   );
-
 
   threeStatus.textContent =
     `Ready r${THREE.REVISION}`;
@@ -1643,7 +1515,6 @@ function validateModelConfig(
     );
   }
 
-
   if (
     !config.path ||
     !config.path
@@ -1655,7 +1526,6 @@ function validateModelConfig(
       `${config.id}: invalid GLB path`
     );
   }
-
 
   if (
     ![
@@ -1674,7 +1544,6 @@ function validateModelConfig(
     );
   }
 
-
   if (
     !Number.isFinite(
       config.scaleMultiplier
@@ -1686,7 +1555,6 @@ function validateModelConfig(
     );
   }
 }
-
 
 /* =========================================================
    LOAD MODEL
@@ -1717,10 +1585,8 @@ function loadModelInstance(
         return;
       }
 
-
       const loader =
         new GLTFLoader();
-
 
       loader.load(
 
@@ -1760,7 +1626,6 @@ function loadModelInstance(
   );
 }
 
-
 /* =========================================================
    CREATE MODEL INSTANCE
 ========================================================= */
@@ -1779,14 +1644,11 @@ function createModelInstance(
     );
   }
 
-
   let meshCount =
     0;
 
-
   const materials =
     new Set();
-
 
   gltf.scene.traverse(
     object => {
@@ -1798,13 +1660,10 @@ function createModelInstance(
         return;
       }
 
-
       meshCount++;
-
 
       object.frustumCulled =
         false;
-
 
       if (
         !object.material
@@ -1812,7 +1671,6 @@ function createModelInstance(
 
         return;
       }
-
 
       const list =
         Array.isArray(
@@ -1822,7 +1680,6 @@ function createModelInstance(
           : [
             object.material
           ];
-
 
       for (
         const material
@@ -1836,7 +1693,6 @@ function createModelInstance(
     }
   );
 
-
   if (
     meshCount === 0
   ) {
@@ -1846,13 +1702,11 @@ function createModelInstance(
     );
   }
 
-
   const box =
     new THREE.Box3()
       .setFromObject(
         gltf.scene
       );
-
 
   if (
     box.isEmpty()
@@ -1863,24 +1717,19 @@ function createModelInstance(
     );
   }
 
-
   const size =
     new THREE.Vector3();
 
-
   const center =
     new THREE.Vector3();
-
 
   box.getSize(
     size
   );
 
-
   box.getCenter(
     center
   );
-
 
   const maxDimension =
     Math.max(
@@ -1888,7 +1737,6 @@ function createModelInstance(
       size.y,
       size.z
     );
-
 
   if (
     !Number.isFinite(
@@ -1902,10 +1750,8 @@ function createModelInstance(
     );
   }
 
-
   const root =
     gltf.scene;
-
 
   root.position.set(
     -center.x,
@@ -1913,12 +1759,10 @@ function createModelInstance(
     -center.z
   );
 
-
   root.scale.setScalar(
     1 /
     maxDimension
   );
-
 
   root.rotation.set(
     config.rotation?.x || 0,
@@ -1926,14 +1770,11 @@ function createModelInstance(
     config.rotation?.z || 0
   );
 
-
   const anchor =
     new THREE.Group();
 
-
   anchor.visible =
     false;
-
 
   anchor.position.set(
     0.5,
@@ -1941,25 +1782,20 @@ function createModelInstance(
     0
   );
 
-
   anchor.scale.setScalar(
     0.1
   );
-
 
   anchor.add(
     root
   );
 
-
   scene.add(
     anchor
   );
 
-
   const animations =
     gltf.animations || [];
-
 
   const clipNames =
     animations.map(
@@ -1971,24 +1807,19 @@ function createModelInstance(
         `Clip ${index}`
     );
 
-
   console.log(
     `[${config.name}] animations:`,
     clipNames
   );
 
-
   let mixer =
     null;
-
 
   let action =
     null;
 
-
   let selectedClipName =
     "None";
-
 
   if (
     animations.length > 0
@@ -2001,7 +1832,6 @@ function createModelInstance(
         ? config.animationIndex
         : 0;
 
-
     if (
       requestedIndex < 0 ||
       requestedIndex >=
@@ -2013,42 +1843,34 @@ function createModelInstance(
       );
     }
 
-
     const clip =
       animations[
       requestedIndex
       ];
 
-
     selectedClipName =
       clip.name ||
       `Clip ${requestedIndex}`;
-
 
     mixer =
       new THREE.AnimationMixer(
         root
       );
 
-
     action =
       mixer.clipAction(
         clip
       );
 
-
     action.reset();
-
 
     action.setLoop(
       THREE.LoopRepeat,
       Infinity
     );
 
-
     action.play();
   }
-
 
   return {
 
@@ -2082,7 +1904,6 @@ function createModelInstance(
   };
 }
 
-
 /* =========================================================
    LOAD ALL MODELS
 ========================================================= */
@@ -2091,7 +1912,6 @@ async function loadAllModels() {
 
   allModelsReady =
     false;
-
 
   try {
 
@@ -2105,7 +1925,6 @@ async function loadAllModels() {
                 rawConfig
               );
 
-
             return loadModelInstance(
               config
             );
@@ -2113,9 +1932,7 @@ async function loadAllModels() {
         )
       );
 
-
     modelInstances.clear();
-
 
     for (
       const instance
@@ -2128,10 +1945,8 @@ async function loadAllModels() {
       );
     }
 
-
     allModelsReady =
       true;
-
 
     updateCombinedModelDebug();
 
@@ -2146,17 +1961,14 @@ async function loadAllModels() {
     allModelsReady =
       false;
 
-
     modelStatus.textContent =
       "FAILED";
-
 
     setError(
       error
     );
   }
 }
-
 
 /* =========================================================
    MODEL DEBUG
@@ -2169,7 +1981,6 @@ function updateCombinedModelDebug() {
       modelInstances.values()
     );
 
-
   const totalMeshes =
     instances.reduce(
       (
@@ -2180,7 +1991,6 @@ function updateCombinedModelDebug() {
         item.stats.meshes,
       0
     );
-
 
   const totalMaterials =
     instances.reduce(
@@ -2193,7 +2003,6 @@ function updateCombinedModelDebug() {
       0
     );
 
-
   const totalAnimations =
     instances.reduce(
       (
@@ -2205,13 +2014,11 @@ function updateCombinedModelDebug() {
       0
     );
 
-
   const names =
     instances.map(
       instance =>
         `${instance.config.name}: ${instance.stats.selectedClipName}`
     );
-
 
   modelStatus.textContent =
     [
@@ -2222,7 +2029,6 @@ function updateCombinedModelDebug() {
       names.join(" | ")
     ].join(" — ");
 }
-
 
 /* =========================================================
    MODEL VISIBILITY
@@ -2239,7 +2045,6 @@ function hideAllModels() {
       false;
   }
 }
-
 
 function updateEffectVisibility() {
 
@@ -2259,7 +2064,6 @@ function updateEffectVisibility() {
     }
   }
 }
-
 
 /* =========================================================
    MODEL ANIMATIONS
@@ -2285,7 +2089,6 @@ function updateModelAnimations(
   }
 }
 
-
 /* =========================================================
    CAPTURE EFFECT NAME
 ========================================================= */
@@ -2294,7 +2097,6 @@ function getCaptureEffectName() {
 
   const names =
     [];
-
 
   for (
     const rawConfig
@@ -2305,7 +2107,6 @@ function getCaptureEffectName() {
       normalizeModelConfig(
         rawConfig
       );
-
 
     if (
       effectIsEnabled(
@@ -2319,7 +2120,6 @@ function getCaptureEffectName() {
     }
   }
 
-
   if (
     enabledEffects.stars
   ) {
@@ -2329,7 +2129,6 @@ function getCaptureEffectName() {
     );
   }
 
-
   if (
     names.length ===
     0
@@ -2338,12 +2137,10 @@ function getCaptureEffectName() {
     return "no-effects";
   }
 
-
   return names.join(
     "-"
   );
 }
-
 
 /* =========================================================
    MODEL TOGGLE HANDLER
@@ -2359,12 +2156,10 @@ function handleModelToggle(
   ] =
     checked;
 
-
   const instance =
     modelInstances.get(
       modelId
     );
-
 
   if (
     instance &&
@@ -2375,10 +2170,8 @@ function handleModelToggle(
       false;
   }
 
-
   updateEffectDebug();
 }
-
 
 /* =========================================================
    EFFECT DEBUG
@@ -2389,7 +2182,6 @@ function updateEffectDebug() {
   const active =
     [];
 
-
   for (
     const rawConfig
     of MODEL_REGISTRY
@@ -2399,7 +2191,6 @@ function updateEffectDebug() {
       normalizeModelConfig(
         rawConfig
       );
-
 
     if (
       effectIsEnabled(
@@ -2413,7 +2204,6 @@ function updateEffectDebug() {
     }
   }
 
-
   if (
     enabledEffects.stars
   ) {
@@ -2423,7 +2213,6 @@ function updateEffectDebug() {
     );
   }
 
-
   effectStatus.textContent =
     active.length > 0
       ? active.join(
@@ -2431,7 +2220,6 @@ function updateEffectDebug() {
       )
       : "None";
 }
-
 
 /* =========================================================
    UPDATE CONTROLS
@@ -2442,21 +2230,17 @@ function updateControls() {
   startButton.disabled =
     cameraRunning;
 
-
   stopButton.disabled =
     !cameraRunning;
 
-
   switchButton.disabled =
     false;
-
 
   captureButton.disabled =
     !(
       cameraRunning &&
       systemReady()
     );
-
 
   for (
     const rawConfig
@@ -2468,12 +2252,10 @@ function updateControls() {
         rawConfig
       );
 
-
     const toggle =
       document.querySelector(
         `#toggle-${config.id}`
       );
-
 
     if (
       toggle
@@ -2486,7 +2268,6 @@ function updateControls() {
     }
   }
 
-
   if (
     toggleStars
   ) {
@@ -2495,10 +2276,8 @@ function updateControls() {
       enabledEffects.stars;
   }
 
-
   updateEffectDebug();
 }
-
 
 /* =========================================================
    SYSTEM READY
@@ -2515,7 +2294,6 @@ function systemReady() {
   );
 }
 
-
 /* =========================================================
    MEDIAPIPE INITIALIZATION
 ========================================================= */
@@ -2527,17 +2305,14 @@ async function initializeMediaPipe() {
     poseStatus.textContent =
       "Loading...";
 
-
     segmentationStatus.textContent =
       "Loading...";
-
 
     const vision =
       await FilesetResolver.forVisionTasks(
 
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm"
       );
-
 
     poseLandmarker =
       await PoseLandmarker.createFromOptions(
@@ -2572,10 +2347,8 @@ async function initializeMediaPipe() {
         }
       );
 
-
     poseStatus.textContent =
       "Ready";
-
 
     imageSegmenter =
       await ImageSegmenter.createFromOptions(
@@ -2604,10 +2377,8 @@ async function initializeMediaPipe() {
         }
       );
 
-
     segmentationStatus.textContent =
       "Ready";
-
 
     updateControls();
 
@@ -2623,13 +2394,11 @@ async function initializeMediaPipe() {
     segmentationStatus.textContent =
       "FAILED";
 
-
     setError(
       error
     );
   }
 }
-
 
 /* =========================================================
    POSE DEBUG
@@ -2647,7 +2416,6 @@ function drawPoseDebug(
 
     return;
   }
-
 
   const connections = [
 
@@ -2672,9 +2440,7 @@ function drawPoseDebug(
     ]
   ];
 
-
   ctx.save();
-
 
   ctx.strokeStyle =
     "#00ff88";
@@ -2684,7 +2450,6 @@ function drawPoseDebug(
 
   ctx.lineWidth =
     3;
-
 
   for (
     const [
@@ -2708,7 +2473,6 @@ function drawPoseDebug(
         ]
       );
 
-
     if (
       !start ||
       !end
@@ -2717,9 +2481,7 @@ function drawPoseDebug(
       continue;
     }
 
-
     ctx.beginPath();
-
 
     ctx.moveTo(
       start.x *
@@ -2729,7 +2491,6 @@ function drawPoseDebug(
       overlay.height
     );
 
-
     ctx.lineTo(
       end.x *
       overlay.width,
@@ -2738,10 +2499,8 @@ function drawPoseDebug(
       overlay.height
     );
 
-
     ctx.stroke();
   }
-
 
   const pointIndexes = [
 
@@ -2753,7 +2512,6 @@ function drawPoseDebug(
     LANDMARK.LEFT_HIP,
     LANDMARK.RIGHT_HIP
   ];
-
 
   for (
     const index
@@ -2767,7 +2525,6 @@ function drawPoseDebug(
         ]
       );
 
-
     if (
       !point
     ) {
@@ -2775,9 +2532,7 @@ function drawPoseDebug(
       continue;
     }
 
-
     ctx.beginPath();
-
 
     ctx.arc(
       point.x *
@@ -2794,14 +2549,11 @@ function drawPoseDebug(
       2
     );
 
-
     ctx.fill();
   }
 
-
   ctx.restore();
 }
-
 
 /* =========================================================
    SEGMENTATION MASK
@@ -2819,13 +2571,11 @@ function buildHumanOcclusionLayer() {
     return false;
   }
 
-
   const width =
     overlay.width;
 
   const height =
     overlay.height;
-
 
   if (
     !width ||
@@ -2835,13 +2585,11 @@ function buildHumanOcclusionLayer() {
     return false;
   }
 
-
   compositeCanvas.width =
     width;
 
   compositeCanvas.height =
     height;
-
 
   maskCanvas.width =
     width;
@@ -2849,25 +2597,21 @@ function buildHumanOcclusionLayer() {
   maskCanvas.height =
     height;
 
-
   segmentationCanvas.width =
     latestSegmentationMask.width;
 
   segmentationCanvas.height =
     latestSegmentationMask.height;
 
-
   const maskData =
     latestSegmentationMask
       .getAsFloat32Array();
-
 
   const imageData =
     segmentationCtx.createImageData(
       latestSegmentationMask.width,
       latestSegmentationMask.height
     );
-
 
   for (
     let i = 0;
@@ -2880,7 +2624,6 @@ function buildHumanOcclusionLayer() {
       maskData[
       i
       ];
-
 
     const alpha =
       confidence <=
@@ -2903,11 +2646,9 @@ function buildHumanOcclusionLayer() {
             255
           );
 
-
     const offset =
       i *
       4;
-
 
     imageData.data[
       offset
@@ -2933,13 +2674,11 @@ function buildHumanOcclusionLayer() {
       alpha;
   }
 
-
   segmentationCtx.putImageData(
     imageData,
     0,
     0
   );
-
 
   maskCtx.clearRect(
     0,
@@ -2948,10 +2687,8 @@ function buildHumanOcclusionLayer() {
     height
   );
 
-
   const transform =
     getVideoTransform();
-
 
   if (
     !transform
@@ -2960,9 +2697,7 @@ function buildHumanOcclusionLayer() {
     return false;
   }
 
-
   maskCtx.save();
-
 
   if (
     facingMode ===
@@ -2980,7 +2715,6 @@ function buildHumanOcclusionLayer() {
     );
   }
 
-
   maskCtx.drawImage(
     segmentationCanvas,
 
@@ -2997,9 +2731,7 @@ function buildHumanOcclusionLayer() {
     transform.renderedHeight
   );
 
-
   maskCtx.restore();
-
 
   compositeCtx.clearRect(
     0,
@@ -3008,9 +2740,7 @@ function buildHumanOcclusionLayer() {
     height
   );
 
-
   compositeCtx.save();
-
 
   compositeCtx.drawImage(
     video,
@@ -3028,7 +2758,6 @@ function buildHumanOcclusionLayer() {
     transform.renderedHeight
   );
 
-
   if (
     facingMode ===
     "user"
@@ -3042,14 +2771,12 @@ function buildHumanOcclusionLayer() {
         height
       );
 
-
     compositeCtx.clearRect(
       0,
       0,
       width,
       height
     );
-
 
     compositeCtx.save();
 
@@ -3072,10 +2799,8 @@ function buildHumanOcclusionLayer() {
     compositeCtx.restore();
   }
 
-
   compositeCtx.globalCompositeOperation =
     "destination-in";
-
 
   compositeCtx.drawImage(
     maskCanvas,
@@ -3083,10 +2808,8 @@ function buildHumanOcclusionLayer() {
     0
   );
 
-
   compositeCtx.globalCompositeOperation =
     "source-over";
-
 
   return true;
 }
@@ -3107,12 +2830,10 @@ function modelNeedsHumanOcclusion(
     return false;
   }
 
-
   const config =
     normalizeModelConfig(
       instance.config
     );
-
 
   if (
     !effectIsEnabled(
@@ -3123,7 +2844,6 @@ function modelNeedsHumanOcclusion(
     return false;
   }
 
-
   if (
     config.occlusion !==
     "HUMAN"
@@ -3131,7 +2851,6 @@ function modelNeedsHumanOcclusion(
 
     return false;
   }
-
 
   switch (
   config.behavior
@@ -3144,13 +2863,11 @@ function modelNeedsHumanOcclusion(
         ORBIT_OCCLUSION_THRESHOLD
       );
 
-
     default:
 
       return false;
   }
 }
-
 
 /* =========================================================
    SHOULD DRAW HUMAN OCCLUSION
@@ -3173,10 +2890,8 @@ function shouldUseHumanOcclusion() {
     }
   }
 
-
   return false;
 }
-
 
 /* =========================================================
    DRAW HUMAN OCCLUSION
@@ -3191,7 +2906,6 @@ function drawFullHumanOcclusion() {
     return;
   }
 
-
   if (
     !buildHumanOcclusionLayer()
   ) {
@@ -3199,14 +2913,12 @@ function drawFullHumanOcclusion() {
     return;
   }
 
-
   ctx.drawImage(
     compositeCanvas,
     0,
     0
   );
 }
-
 
 /* =========================================================
    ORBIT BEHAVIOR
@@ -3220,11 +2932,9 @@ function updateOrbitBehavior(
   const config =
     instance.config;
 
-
   orbitAngle +=
     ORBIT_SPEED *
     delta;
-
 
   if (
     orbitAngle >
@@ -3235,7 +2945,6 @@ function updateOrbitBehavior(
       Math.PI * 2;
   }
 
-
   /* ---------------------------------------------------------
      ORBIT AXES
   --------------------------------------------------------- */
@@ -3245,18 +2954,15 @@ function updateOrbitBehavior(
       orbitAngle
     );
 
-
   orbitDepth =
     Math.sin(
       orbitAngle
     );
 
-
   const orbitY =
     Math.sin(
       orbitAngle * 2
     );
-
 
   /* ---------------------------------------------------------
      BACK AMOUNT
@@ -3276,7 +2982,6 @@ function updateOrbitBehavior(
       -orbitDepth
     );
 
-
   /* ---------------------------------------------------------
      ORBIT SIZE
   --------------------------------------------------------- */
@@ -3291,22 +2996,18 @@ function updateOrbitBehavior(
       )
     );
 
-
   const radiusY =
     trackedBody.torsoHeight *
     ORBIT_RADIUS_Y;
-
 
   const centerYOffset =
     trackedBody.torsoHeight *
     ORBIT_CENTER_Y;
 
-
   const backLift =
     trackedBody.torsoHeight *
     backAmount *
     ORBIT_BACK_LIFT;
-
 
   /* ---------------------------------------------------------
      TARGET POSITION
@@ -3317,14 +3018,12 @@ function updateOrbitBehavior(
     orbitX *
     radiusX;
 
-
   const targetY =
     trackedBody.centerY +
     centerYOffset +
     orbitY *
     radiusY -
     backLift;
-
 
   /* ---------------------------------------------------------
      BODY-RELATIVE SCALE
@@ -3337,11 +3036,9 @@ function updateOrbitBehavior(
     trackedBody.torsoHeight *
     0.35;
 
-
   const baseScale =
     bodyReference *
     config.scaleMultiplier;
-
 
   /* ---------------------------------------------------------
      FAKE DEPTH SCALE
@@ -3355,7 +3052,6 @@ function updateOrbitBehavior(
     orbitDepth *
     ORBIT_DEPTH_SCALE;
 
-
   const targetScale =
     THREE.MathUtils.clamp(
 
@@ -3366,7 +3062,6 @@ function updateOrbitBehavior(
 
       1.2
     );
-
 
   /* ---------------------------------------------------------
      SMOOTH POSITION
@@ -3380,7 +3075,6 @@ function updateOrbitBehavior(
       delta
     );
 
-
   instance.anchor.position.y =
     damp(
       instance.anchor.position.y,
@@ -3389,7 +3083,6 @@ function updateOrbitBehavior(
       delta
     );
 
-
   /* ---------------------------------------------------------
      SCREEN-SPACE FAKE DEPTH
   --------------------------------------------------------- */
@@ -3397,7 +3090,6 @@ function updateOrbitBehavior(
   instance.anchor.position.z =
     orbitDepth *
     0.1;
-
 
   /* ---------------------------------------------------------
      SMOOTH SCALE
@@ -3411,11 +3103,9 @@ function updateOrbitBehavior(
       delta
     );
 
-
   instance.anchor.scale.setScalar(
     smoothScale
   );
-
 
   /* ---------------------------------------------------------
      FOLLOW TRAVEL DIRECTION
@@ -3430,12 +3120,10 @@ function updateOrbitBehavior(
         orbitAngle
       );
 
-
     const targetRotationY =
       movementX >= 0
         ? Math.PI / 2
         : -Math.PI / 2;
-
 
     instance.anchor.rotation.y =
       dampAngle(
@@ -3445,7 +3133,6 @@ function updateOrbitBehavior(
         delta
       );
   }
-
 
   /* ---------------------------------------------------------
      SMALL BANKING MOTION
@@ -3457,7 +3144,6 @@ function updateOrbitBehavior(
       12
     );
 
-
   instance.anchor.rotation.z =
     damp(
       instance.anchor.rotation.z,
@@ -3466,10 +3152,8 @@ function updateOrbitBehavior(
       delta
     );
 
-
   instance.anchor.visible =
     true;
-
 
   /* ---------------------------------------------------------
      FRONT / EDGE / BACK DEBUG
@@ -3477,7 +3161,6 @@ function updateOrbitBehavior(
 
   let depthText =
     "FRONT";
-
 
   if (
     orbitDepth <
@@ -3496,12 +3179,10 @@ function updateOrbitBehavior(
       "EDGE";
   }
 
-
   return (
     `Butterfly ORBIT ${depthText}`
   );
 }
-
 
 /* =========================================================
    SHOULDER BEHAVIOR
@@ -3515,18 +3196,15 @@ function updateShoulderBehavior(
   const config =
     instance.config;
 
-
   const shoulderConfig =
     config.shoulder ||
     {};
-
 
   const requestedSide =
     shoulderConfig.side ===
       "left"
       ? "left"
       : "right";
-
 
   const offsetX =
     Number.isFinite(
@@ -3535,14 +3213,12 @@ function updateShoulderBehavior(
       ? shoulderConfig.offsetX
       : 0.55;
 
-
   const offsetY =
     Number.isFinite(
       shoulderConfig.offsetY
     )
       ? shoulderConfig.offsetY
       : 0.25;
-
 
   let screenLeftX;
 
@@ -3552,7 +3228,6 @@ function updateShoulderBehavior(
 
   let screenRightY;
 
-
   if (
     trackedBody.leftShoulderX <=
     trackedBody.rightShoulderX
@@ -3561,14 +3236,11 @@ function updateShoulderBehavior(
     screenLeftX =
       trackedBody.leftShoulderX;
 
-
     screenLeftY =
       trackedBody.leftShoulderY;
 
-
     screenRightX =
       trackedBody.rightShoulderX;
-
 
     screenRightY =
       trackedBody.rightShoulderY;
@@ -3578,24 +3250,19 @@ function updateShoulderBehavior(
     screenLeftX =
       trackedBody.rightShoulderX;
 
-
     screenLeftY =
       trackedBody.rightShoulderY;
 
-
     screenRightX =
       trackedBody.leftShoulderX;
-
 
     screenRightY =
       trackedBody.leftShoulderY;
   }
 
-
   let targetX;
 
   let targetY;
-
 
   if (
     requestedSide ===
@@ -3606,7 +3273,6 @@ function updateShoulderBehavior(
       screenLeftX -
       trackedBody.shoulderWidth *
       offsetX;
-
 
     targetY =
       screenLeftY +
@@ -3620,13 +3286,11 @@ function updateShoulderBehavior(
       trackedBody.shoulderWidth *
       offsetX;
 
-
     targetY =
       screenRightY +
       trackedBody.torsoHeight *
       offsetY;
   }
-
 
   const bodyReference =
     trackedBody.shoulderWidth *
@@ -3635,10 +3299,8 @@ function updateShoulderBehavior(
     trackedBody.torsoHeight *
     0.35;
 
-
   const shoulderScaleFactor =
     0.88;
-
 
   const targetScale =
     THREE.MathUtils.clamp(
@@ -3652,7 +3314,6 @@ function updateShoulderBehavior(
       0.85
     );
 
-
   instance.anchor.position.x =
     damp(
       instance.anchor.position.x,
@@ -3660,7 +3321,6 @@ function updateShoulderBehavior(
       POSITION_SMOOTHING,
       delta
     );
-
 
   instance.anchor.position.y =
     damp(
@@ -3670,10 +3330,8 @@ function updateShoulderBehavior(
       delta
     );
 
-
   instance.anchor.position.z =
     0;
-
 
   const smoothScale =
     damp(
@@ -3683,11 +3341,9 @@ function updateShoulderBehavior(
       delta
     );
 
-
   instance.anchor.scale.setScalar(
     smoothScale
   );
-
 
   instance.anchor.rotation.y =
     dampAngle(
@@ -3697,7 +3353,6 @@ function updateShoulderBehavior(
       delta
     );
 
-
   instance.anchor.rotation.z =
     damp(
       instance.anchor.rotation.z,
@@ -3706,16 +3361,13 @@ function updateShoulderBehavior(
       delta
     );
 
-
   instance.anchor.visible =
     true;
-
 
   return (
     `${config.name} SHOULDER ${requestedSide.toUpperCase()}`
   );
 }
-
 
 /* =========================================================
    TORSO ATTACH
@@ -3729,11 +3381,9 @@ function updateTorsoAttachBehavior(
   const config =
     instance.config;
 
-
   const torsoConfig =
     config.torso ||
     {};
-
 
   const offsetX =
     Number.isFinite(
@@ -3742,14 +3392,12 @@ function updateTorsoAttachBehavior(
       ? torsoConfig.offsetX
       : 0;
 
-
   const offsetY =
     Number.isFinite(
       torsoConfig.offsetY
     )
       ? torsoConfig.offsetY
       : 0;
-
 
   const scaleFactor =
     Number.isFinite(
@@ -3758,18 +3406,15 @@ function updateTorsoAttachBehavior(
       ? torsoConfig.scaleFactor
       : 1;
 
-
   const targetX =
     trackedBody.centerX +
     trackedBody.shoulderWidth *
     offsetX;
 
-
   const targetY =
     trackedBody.centerY +
     trackedBody.torsoHeight *
     offsetY;
-
 
   const bodyReference =
     trackedBody.shoulderWidth *
@@ -3777,7 +3422,6 @@ function updateTorsoAttachBehavior(
     +
     trackedBody.torsoHeight *
     0.4;
-
 
   const targetScale =
     THREE.MathUtils.clamp(
@@ -3791,7 +3435,6 @@ function updateTorsoAttachBehavior(
       1.2
     );
 
-
   instance.anchor.position.x =
     damp(
       instance.anchor.position.x,
@@ -3799,7 +3442,6 @@ function updateTorsoAttachBehavior(
       POSITION_SMOOTHING,
       delta
     );
-
 
   instance.anchor.position.y =
     damp(
@@ -3809,10 +3451,8 @@ function updateTorsoAttachBehavior(
       delta
     );
 
-
   instance.anchor.position.z =
     0;
-
 
   const smoothScale =
     damp(
@@ -3822,11 +3462,9 @@ function updateTorsoAttachBehavior(
       delta
     );
 
-
   instance.anchor.scale.setScalar(
     smoothScale
   );
-
 
   instance.anchor.rotation.y =
     dampAngle(
@@ -3836,7 +3474,6 @@ function updateTorsoAttachBehavior(
       delta
     );
 
-
   instance.anchor.rotation.z =
     damp(
       instance.anchor.rotation.z,
@@ -3845,16 +3482,13 @@ function updateTorsoAttachBehavior(
       delta
     );
 
-
   instance.anchor.visible =
     true;
-
 
   return (
     `${config.name} TORSO_ATTACH`
   );
 }
-
 
 /* =========================================================
    HEAD ATTACH
@@ -3868,11 +3502,9 @@ function updateHeadAttachBehavior(
   const config =
     instance.config;
 
-
   const headConfig =
     config.head ||
     {};
-
 
   const offsetX =
     Number.isFinite(
@@ -3881,14 +3513,12 @@ function updateHeadAttachBehavior(
       ? headConfig.offsetX
       : 0;
 
-
   const offsetY =
     Number.isFinite(
       headConfig.offsetY
     )
       ? headConfig.offsetY
       : 0.55;
-
 
   const scaleFactor =
     Number.isFinite(
@@ -3897,18 +3527,15 @@ function updateHeadAttachBehavior(
       ? headConfig.scaleFactor
       : 1;
 
-
   const targetX =
     trackedBody.headX +
     trackedBody.shoulderWidth *
     offsetX;
 
-
   const targetY =
     trackedBody.headY +
     trackedBody.shoulderWidth *
     offsetY;
-
 
   const targetScale =
     THREE.MathUtils.clamp(
@@ -3922,7 +3549,6 @@ function updateHeadAttachBehavior(
       0.8
     );
 
-
   instance.anchor.position.x =
     damp(
       instance.anchor.position.x,
@@ -3930,7 +3556,6 @@ function updateHeadAttachBehavior(
       POSITION_SMOOTHING,
       delta
     );
-
 
   instance.anchor.position.y =
     damp(
@@ -3940,10 +3565,8 @@ function updateHeadAttachBehavior(
       delta
     );
 
-
   instance.anchor.position.z =
     0.03;
-
 
   const smoothScale =
     damp(
@@ -3953,11 +3576,9 @@ function updateHeadAttachBehavior(
       delta
     );
 
-
   instance.anchor.scale.setScalar(
     smoothScale
   );
-
 
   instance.anchor.rotation.y =
     dampAngle(
@@ -3967,7 +3588,6 @@ function updateHeadAttachBehavior(
       delta
     );
 
-
   instance.anchor.rotation.z =
     damp(
       instance.anchor.rotation.z,
@@ -3976,16 +3596,13 @@ function updateHeadAttachBehavior(
       delta
     );
 
-
   instance.anchor.visible =
     true;
-
 
   return (
     `${config.name} HEAD_ATTACH`
   );
 }
-
 
 /* =========================================================
    BESIDE
@@ -3999,18 +3616,15 @@ function updateBesideBehavior(
   const config =
     instance.config;
 
-
   const beside =
     config.beside ||
     {};
-
 
   const side =
     beside.side ===
       "left"
       ? -1
       : 1;
-
 
   const distance =
     Number.isFinite(
@@ -4019,7 +3633,6 @@ function updateBesideBehavior(
       ? beside.distance
       : 1.2;
 
-
   const offsetY =
     Number.isFinite(
       beside.offsetY
@@ -4027,19 +3640,16 @@ function updateBesideBehavior(
       ? beside.offsetY
       : 0;
 
-
   const targetX =
     trackedBody.centerX +
     side *
     trackedBody.shoulderWidth *
     distance;
 
-
   const targetY =
     trackedBody.centerY +
     trackedBody.torsoHeight *
     offsetY;
-
 
   const bodyReference =
     trackedBody.shoulderWidth *
@@ -4047,7 +3657,6 @@ function updateBesideBehavior(
     +
     trackedBody.torsoHeight *
     0.35;
-
 
   const targetScale =
     THREE.MathUtils.clamp(
@@ -4060,7 +3669,6 @@ function updateBesideBehavior(
       1.2
     );
 
-
   instance.anchor.position.x =
     damp(
       instance.anchor.position.x,
@@ -4068,7 +3676,6 @@ function updateBesideBehavior(
       POSITION_SMOOTHING,
       delta
     );
-
 
   instance.anchor.position.y =
     damp(
@@ -4078,10 +3685,8 @@ function updateBesideBehavior(
       delta
     );
 
-
   instance.anchor.position.z =
     0;
-
 
   const smoothScale =
     damp(
@@ -4091,11 +3696,9 @@ function updateBesideBehavior(
       delta
     );
 
-
   instance.anchor.scale.setScalar(
     smoothScale
   );
-
 
   instance.anchor.rotation.y =
     dampAngle(
@@ -4105,7 +3708,6 @@ function updateBesideBehavior(
       delta
     );
 
-
   instance.anchor.rotation.z =
     damp(
       instance.anchor.rotation.z,
@@ -4114,16 +3716,13 @@ function updateBesideBehavior(
       delta
     );
 
-
   instance.anchor.visible =
     true;
-
 
   return (
     `${config.name} BESIDE`
   );
 }
-
 
 /* =========================================================
    ALL MODEL BEHAVIORS
@@ -4139,22 +3738,17 @@ function updateAllModelBehaviors(
 
     hideAllModels();
 
-
     anchorStatus.textContent =
       "Hidden";
-
 
     return;
   }
 
-
   const debug =
     [];
 
-
   let orbitActive =
     false;
-
 
   for (
     const instance
@@ -4166,7 +3760,6 @@ function updateAllModelBehaviors(
         instance.config
       );
 
-
     if (
       !effectIsEnabled(
         config.id
@@ -4176,10 +3769,8 @@ function updateAllModelBehaviors(
       instance.anchor.visible =
         false;
 
-
       continue;
     }
-
 
     switch (
     config.behavior
@@ -4190,7 +3781,6 @@ function updateAllModelBehaviors(
         orbitActive =
           true;
 
-
         debug.push(
           updateOrbitBehavior(
             instance,
@@ -4198,9 +3788,7 @@ function updateAllModelBehaviors(
           )
         );
 
-
         break;
-
 
       case "SHOULDER":
 
@@ -4211,9 +3799,7 @@ function updateAllModelBehaviors(
           )
         );
 
-
         break;
-
 
       case "BESIDE":
 
@@ -4224,9 +3810,7 @@ function updateAllModelBehaviors(
           )
         );
 
-
         break;
-
 
       case "TORSO_ATTACH":
 
@@ -4237,9 +3821,7 @@ function updateAllModelBehaviors(
           )
         );
 
-
         break;
-
 
       case "HEAD_ATTACH":
 
@@ -4250,9 +3832,7 @@ function updateAllModelBehaviors(
           )
         );
 
-
         break;
-
 
       default:
 
@@ -4263,7 +3843,6 @@ function updateAllModelBehaviors(
     }
   }
 
-
   if (
     !orbitActive
   ) {
@@ -4271,7 +3850,6 @@ function updateAllModelBehaviors(
     orbitDepth =
       0;
   }
-
 
   anchorStatus.textContent =
     debug.length > 0
@@ -4290,7 +3868,6 @@ function initializeStars() {
   starParticles.length =
     0;
 
-
   for (
     let i = 0;
     i < STAR_COUNT;
@@ -4304,7 +3881,6 @@ function initializeStars() {
       ) *
       Math.PI *
       2;
-
 
     starParticles.push({
 
@@ -4333,7 +3909,6 @@ function initializeStars() {
   }
 }
 
-
 /* =========================================================
    DRAW STAR SHAPE
 ========================================================= */
@@ -4350,9 +3925,7 @@ function drawStarShape(
   const points =
     5;
 
-
   context.beginPath();
-
 
   for (
     let i = 0;
@@ -4366,7 +3939,6 @@ function drawStarShape(
         ? outerRadius
         : innerRadius;
 
-
     const angle =
       rotation +
       (
@@ -4376,7 +3948,6 @@ function drawStarShape(
       ) -
       Math.PI / 2;
 
-
     const px =
       x +
       Math.cos(
@@ -4384,14 +3955,12 @@ function drawStarShape(
       ) *
       radius;
 
-
     const py =
       y +
       Math.sin(
         angle
       ) *
       radius;
-
 
     if (
       i === 0
@@ -4411,12 +3980,10 @@ function drawStarShape(
     }
   }
 
-
   context.closePath();
 
   context.fill();
 }
-
 
 /* =========================================================
    DRAW STARS EFFECT
@@ -4428,7 +3995,6 @@ function drawStarsEffect(
 
   clearEffectOverlay();
 
-
   if (
     !enabledEffects.stars ||
     !trackedBody.valid
@@ -4436,7 +4002,6 @@ function drawStarsEffect(
 
     return;
   }
-
 
   if (
     starParticles.length ===
@@ -4446,13 +4011,11 @@ function drawStarsEffect(
     initializeStars();
   }
 
-
   const width =
     effectOverlay.width;
 
   const height =
     effectOverlay.height;
-
 
   if (
     !width ||
@@ -4462,11 +4025,9 @@ function drawStarsEffect(
     return;
   }
 
-
   const centerX =
     trackedBody.centerX *
     width;
-
 
   const centerY =
     (
@@ -4476,23 +4037,18 @@ function drawStarsEffect(
     ) *
     height;
 
-
   const bodyWidth =
     trackedBody.shoulderWidth *
     width;
-
 
   const bodyHeight =
     trackedBody.torsoHeight *
     height;
 
-
   effectCtx.save();
-
 
   effectCtx.fillStyle =
     "rgba(255,255,255,0.95)";
-
 
   for (
     const star
@@ -4503,24 +4059,20 @@ function drawStarsEffect(
       timestamp *
       0.001;
 
-
     const currentAngle =
       star.angle +
       time *
       star.speed;
-
 
     const radiusX =
       bodyWidth *
       1.3 *
       star.radiusMultiplier;
 
-
     const radiusY =
       bodyHeight *
       0.75 *
       star.radiusMultiplier;
-
 
     const pulse =
       1 +
@@ -4531,14 +4083,12 @@ function drawStarsEffect(
       ) *
       0.12;
 
-
     const x =
       centerX +
       Math.cos(
         currentAngle
       ) *
       radiusX;
-
 
     const y =
       centerY +
@@ -4548,7 +4098,6 @@ function drawStarsEffect(
       ) *
       radiusY;
 
-
     const size =
       Math.max(
         3,
@@ -4557,7 +4106,6 @@ function drawStarsEffect(
         star.sizeMultiplier *
         pulse
       );
-
 
     drawStarShape(
       effectCtx,
@@ -4570,10 +4118,8 @@ function drawStarsEffect(
     );
   }
 
-
   effectCtx.restore();
 }
-
 
 /* =========================================================
    SEGMENTATION UPDATE
@@ -4593,7 +4139,6 @@ function updateSegmentation(
     return;
   }
 
-
   if (
     timestamp -
     latestSegmentationTimestamp <
@@ -4603,10 +4148,8 @@ function updateSegmentation(
     return;
   }
 
-
   latestSegmentationTimestamp =
     timestamp;
-
 
   try {
 
@@ -4628,10 +4171,8 @@ function updateSegmentation(
           segmentationStatus.textContent =
             "No Mask";
 
-
           return;
         }
-
 
         if (
           latestSegmentationMask &&
@@ -4641,12 +4182,10 @@ function updateSegmentation(
           latestSegmentationMask.close();
         }
 
-
         latestSegmentationMask =
           result.confidenceMasks[
           0
           ];
-
 
         segmentationStatus.textContent =
           "Human Mask";
@@ -4660,14 +4199,12 @@ function updateSegmentation(
     segmentationStatus.textContent =
       "Error";
 
-
     console.warn(
       "[Human AR] segmentation:",
       error
     );
   }
 }
-
 
 /* =========================================================
    DRAW OVERLAY
@@ -4677,14 +4214,12 @@ function drawOverlay() {
 
   clearOverlay();
 
-
   if (
     !cameraRunning
   ) {
 
     return;
   }
-
 
   /*
    * IMPORTANT:
@@ -4696,7 +4231,6 @@ function drawOverlay() {
 
   drawFullHumanOcclusion();
 
-
   if (
     latestLandmarks
   ) {
@@ -4706,7 +4240,6 @@ function drawOverlay() {
     );
   }
 }
-
 
 /* =========================================================
    MODEL LAYER ROUTING
@@ -4735,10 +4268,8 @@ function renderModelLayers() {
     return;
   }
 
-
   const originalVisibility =
     new Map();
-
 
   /*
    * Save the real visibility state produced
@@ -4757,7 +4288,6 @@ function renderModelLayers() {
     );
   }
 
-
   /* ---------------------------------------------------------
      BACK PASS
   --------------------------------------------------------- */
@@ -4772,7 +4302,6 @@ function renderModelLayers() {
         instance.config.id
       );
 
-
     instance.anchor.visible =
       Boolean(
         wasVisible &&
@@ -4782,12 +4311,10 @@ function renderModelLayers() {
       );
   }
 
-
   renderer.render(
     scene,
     threeCamera
   );
-
 
   /* ---------------------------------------------------------
      FRONT PASS
@@ -4803,7 +4330,6 @@ function renderModelLayers() {
         instance.config.id
       );
 
-
     instance.anchor.visible =
       Boolean(
         wasVisible &&
@@ -4813,12 +4339,10 @@ function renderModelLayers() {
       );
   }
 
-
   frontRenderer.render(
     scene,
     threeCamera
   );
-
 
   /* ---------------------------------------------------------
      RESTORE REAL MODEL VISIBILITY
@@ -4838,7 +4362,6 @@ function renderModelLayers() {
   }
 }
 
-
 /* =========================================================
    POSE RESULT
 ========================================================= */
@@ -4857,32 +4380,25 @@ function processPoseResult(
     latestLandmarks =
       null;
 
-
     trackedBody.valid =
       false;
-
 
     poseStatus.textContent =
       "No Person";
 
-
     hideAllModels();
-
 
     return;
   }
-
 
   latestLandmarks =
     result.landmarks[
     0
     ];
 
-
   updateTrackedBody(
     latestLandmarks
   );
-
 
   if (
     trackedBody.valid
@@ -4898,7 +4414,6 @@ function processPoseResult(
   }
 }
 
-
 /* =========================================================
    MAIN LOOP
 ========================================================= */
@@ -4912,16 +4427,13 @@ function predictPose() {
     return;
   }
 
-
   animationFrameId =
     requestAnimationFrame(
       predictPose
     );
 
-
   const now =
     performance.now();
-
 
   const delta =
     Math.min(
@@ -4934,13 +4446,10 @@ function predictPose() {
       0.1
     );
 
-
   lastFrameTimestamp =
     now;
 
-
   resizeOverlay();
-
 
   if (
     video.readyState <
@@ -4949,7 +4458,6 @@ function predictPose() {
 
     return;
   }
-
 
   /*
    * Run pose only when a new camera frame exists.
@@ -4963,7 +4471,6 @@ function predictPose() {
     lastVideoTime =
       video.currentTime;
 
-
     if (
       poseLandmarker
     ) {
@@ -4975,7 +4482,6 @@ function predictPose() {
             video,
             now
           );
-
 
         processPoseResult(
           result
@@ -4992,12 +4498,10 @@ function predictPose() {
       }
     }
 
-
     updateSegmentation(
       now
     );
   }
-
 
   /*
    * Model animations continue every render frame.
@@ -5007,7 +4511,6 @@ function predictPose() {
     delta
   );
 
-
   /*
    * Body-relative behavior update.
    */
@@ -5016,9 +4519,7 @@ function predictPose() {
     delta
   );
 
-
   updateEffectVisibility();
-
 
   /*
    * Render the GLBs into their appropriate
@@ -5026,7 +4527,6 @@ function predictPose() {
    */
 
   renderModelLayers();
-
 
   /*
    * BODY_EFFECT layer.
@@ -5036,14 +4536,12 @@ function predictPose() {
     now
   );
 
-
   /*
    * Human occlusion + pose debug.
    */
 
   drawOverlay();
 }
-
 
 /* =========================================================
    CAPTURE CAMERA FRAME
@@ -5057,7 +4555,6 @@ function drawCameraToCapture(
   const transform =
     getVideoTransform();
 
-
   if (
     !transform
   ) {
@@ -5065,9 +4562,7 @@ function drawCameraToCapture(
     return false;
   }
 
-
   captureCtx.save();
-
 
   captureCtx.clearRect(
     0,
@@ -5075,7 +4570,6 @@ function drawCameraToCapture(
     width,
     height
   );
-
 
   /*
    * Match the mirrored front-camera preview.
@@ -5091,13 +4585,11 @@ function drawCameraToCapture(
       0
     );
 
-
     captureCtx.scale(
       -1,
       1
     );
   }
-
 
   captureCtx.drawImage(
 
@@ -5122,13 +4614,10 @@ function drawCameraToCapture(
     transform.renderedHeight
   );
 
-
   captureCtx.restore();
-
 
   return true;
 }
-
 
 /* =========================================================
    CAPTURE HUMAN OCCLUSION
@@ -5143,14 +4632,12 @@ function drawHumanOcclusionToCapture() {
     return;
   }
 
-
   if (
     !buildHumanOcclusionLayer()
   ) {
 
     return;
   }
-
 
   captureCtx.drawImage(
     compositeCanvas,
@@ -5162,7 +4649,6 @@ function drawHumanOcclusionToCapture() {
   );
 }
 
-
 /* =========================================================
    CAPTURE PHOTO
 ========================================================= */
@@ -5172,7 +4658,6 @@ function capturePhoto() {
   try {
 
     clearError();
-
 
     if (
       !cameraRunning ||
@@ -5184,18 +4669,14 @@ function capturePhoto() {
       captureStatus.textContent =
         "Not Ready";
 
-
       return;
     }
-
 
     const width =
       overlay.width;
 
-
     const height =
       overlay.height;
-
 
     if (
       !width ||
@@ -5205,18 +4686,14 @@ function capturePhoto() {
       captureStatus.textContent =
         "Invalid Size";
 
-
       return;
     }
-
 
     captureCanvas.width =
       width;
 
-
     captureCanvas.height =
       height;
-
 
     /*
      * Refresh both model render passes immediately
@@ -5224,7 +4701,6 @@ function capturePhoto() {
      */
 
     renderModelLayers();
-
 
     /* -------------------------------------------------------
        1. CAMERA
@@ -5240,10 +4716,8 @@ function capturePhoto() {
       captureStatus.textContent =
         "Camera Failed";
 
-
       return;
     }
-
 
     /* -------------------------------------------------------
        2. BACK GLB LAYER
@@ -5261,7 +4735,6 @@ function capturePhoto() {
       height
     );
 
-
     /* -------------------------------------------------------
        3. HUMAN CUTOUT
 
@@ -5269,7 +4742,6 @@ function capturePhoto() {
     ------------------------------------------------------- */
 
     drawHumanOcclusionToCapture();
-
 
     /* -------------------------------------------------------
        4. STARS
@@ -5293,7 +4765,6 @@ function capturePhoto() {
       );
     }
 
-
     /* -------------------------------------------------------
        5. FRONT GLB LAYER
 
@@ -5310,19 +4781,15 @@ function capturePhoto() {
       height
     );
 
-
     /*
      * Pose debug is intentionally NOT captured.
      */
 
-
     captureStatus.textContent =
       "Captured";
 
-
     const effectName =
       getCaptureEffectName();
-
 
     const timestamp =
       new Date()
@@ -5332,10 +4799,8 @@ function capturePhoto() {
           "-"
         );
 
-
     const filename =
       `human-ar-${effectName}-${timestamp}.jpg`;
-
 
     captureCanvas.toBlob(
 
@@ -5348,41 +4813,32 @@ function capturePhoto() {
           captureStatus.textContent =
             "Capture Failed";
 
-
           return;
         }
-
 
         const url =
           URL.createObjectURL(
             blob
           );
 
-
         const link =
           document.createElement(
             "a"
           );
 
-
         link.href =
           url;
 
-
         link.download =
           filename;
-
 
         document.body.appendChild(
           link
         );
 
-
         link.click();
 
-
         link.remove();
-
 
         setTimeout(
           () => {
@@ -5407,7 +4863,6 @@ function capturePhoto() {
 
     captureStatus.textContent =
       "Capture Error";
-
 
     setError(
       error
@@ -5442,7 +4897,6 @@ function bindModelToggleEvents() {
   }
 }
 
-
 /* =========================================================
    STARS TOGGLE
 ========================================================= */
@@ -5454,7 +4908,6 @@ function handleStarsToggle() {
       toggleStars.checked
     );
 
-
   if (
     !enabledEffects.stars
   ) {
@@ -5462,10 +4915,8 @@ function handleStarsToggle() {
     clearEffectOverlay();
   }
 
-
   updateEffectDebug();
 }
-
 
 /* =========================================================
    BUTTON EVENTS
@@ -5479,7 +4930,6 @@ startButton.addEventListener(
   }
 );
 
-
 stopButton.addEventListener(
   "click",
   () => {
@@ -5487,7 +4937,6 @@ stopButton.addEventListener(
     stopStream();
   }
 );
-
 
 switchButton.addEventListener(
   "click",
@@ -5497,7 +4946,6 @@ switchButton.addEventListener(
   }
 );
 
-
 captureButton.addEventListener(
   "click",
   () => {
@@ -5505,7 +4953,6 @@ captureButton.addEventListener(
     capturePhoto();
   }
 );
-
 
 /* =========================================================
    STAR EVENT
@@ -5521,7 +4968,6 @@ if (
   );
 }
 
-
 /* =========================================================
    VIDEO EVENTS
 ========================================================= */
@@ -5536,7 +4982,6 @@ video.addEventListener(
   }
 );
 
-
 /* =========================================================
    WINDOW RESIZE
 ========================================================= */
@@ -5550,7 +4995,6 @@ window.addEventListener(
     resizeThree();
   }
 );
-
 
 /* =========================================================
    ORIENTATION CHANGE
@@ -5578,7 +5022,6 @@ window.addEventListener(
   }
 );
 
-
 /* =========================================================
    PAGE VISIBILITY
 ========================================================= */
@@ -5603,7 +5046,6 @@ document.addEventListener(
   }
 );
 
-
 /* =========================================================
    BEFORE UNLOAD
 ========================================================= */
@@ -5613,7 +5055,6 @@ window.addEventListener(
   () => {
 
     stopMediaTracks();
-
 
     if (
       latestSegmentationMask &&
@@ -5625,7 +5066,6 @@ window.addEventListener(
   }
 );
 
-
 /* =========================================================
    INITIAL UI STATE
 ========================================================= */
@@ -5635,79 +5075,60 @@ function initializeUI() {
   systemStatus.textContent =
     "Loading...";
 
-
   cameraStatus.textContent =
     "Stopped";
-
 
   poseStatus.textContent =
     "Loading...";
 
-
   segmentationStatus.textContent =
     "Loading...";
-
 
   threeStatus.textContent =
     "Loading...";
 
-
   modelStatus.textContent =
     "Loading...";
-
 
   anchorStatus.textContent =
     "Hidden";
 
-
   effectStatus.textContent =
     "Loading...";
-
 
   captureStatus.textContent =
     "Ready";
 
-
   errorStatus.textContent =
     "None";
-
 
   video.style.display =
     "none";
 
-
   threeLayer.style.display =
     "none";
-
 
   frontThreeLayer.style.display =
     "none";
 
-
   effectOverlay.style.display =
     "none";
-
 
   overlay.style.display =
     "none";
 
-
   startButton.disabled =
     true;
-
 
   stopButton.disabled =
     true;
 
-
   switchButton.disabled =
     true;
-
 
   captureButton.disabled =
     true;
 }
-
 
 /* =========================================================
    APPLICATION BOOT
@@ -5717,16 +5138,11 @@ async function initializeApplication() {
 
   try {
 
-    systemStatus.textContent =
-      "Ready";
-
     console.log(
       "[Human AR] M8.12B — Per-effect Layering + Orbit Transition"
     );
 
-
     initializeUI();
-
 
     /*
      * Build the model checkboxes directly from MODEL_REGISTRY.
@@ -5734,9 +5150,7 @@ async function initializeApplication() {
 
     createModelToggles();
 
-
     bindModelToggleEvents();
-
 
     /*
      * Stars remain a BODY_EFFECT rather than a GLB registry model.
@@ -5744,14 +5158,12 @@ async function initializeApplication() {
 
     initializeStars();
 
-
     /*
      * Three.js is synchronous.
      * Both BACK and FRONT renderers are created here.
      */
 
     initializeThree();
-
 
     /*
      * MediaPipe and GLBs can load independently.
@@ -5764,9 +5176,7 @@ async function initializeApplication() {
       loadAllModels()
     ]);
 
-
     updateControls();
-
 
     if (
       systemReady()
@@ -5775,18 +5185,17 @@ async function initializeApplication() {
       threeStatus.textContent =
         `Ready r${THREE.REVISION}`;
 
-
       startButton.disabled =
         false;
-
 
       switchButton.disabled =
         false;
 
-
       captureStatus.textContent =
         "Ready";
 
+      systemStatus.textContent =
+        "Ready";
 
       console.log(
         "[Human AR] System Ready"
@@ -5799,7 +5208,6 @@ async function initializeApplication() {
       );
     }
 
-
   } catch (
   error
   ) {
@@ -5807,15 +5215,12 @@ async function initializeApplication() {
     startButton.disabled =
       true;
 
-
     captureButton.disabled =
       true;
-
 
     setError(
       error
     );
-
 
     console.error(
       "[Human AR] Initialization failed:",
@@ -5823,7 +5228,6 @@ async function initializeApplication() {
     );
   }
 }
-
 
 /* =========================================================
    START APPLICATION

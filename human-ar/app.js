@@ -28,6 +28,11 @@ const video =
 const threeLayer =
   document.querySelector("#three-layer");
 
+const frontThreeLayer =
+  document.querySelector(
+    "#three-front-layer"
+  );
+
 const overlay =
   document.querySelector("#pose-overlay");
 
@@ -644,6 +649,8 @@ let threeCamera =
 let renderer =
   null;
 
+let frontRenderer =
+  null;
 
 /* =========================================================
    ORBIT SETTINGS
@@ -1094,7 +1101,42 @@ function initializeThree() {
   threeLayer.appendChild(
     renderer.domElement
   );
+  
+  frontRenderer =
+  new THREE.WebGLRenderer({
 
+    alpha:
+      true,
+
+    antialias:
+      true,
+
+    preserveDrawingBuffer:
+      true
+  });
+
+
+frontRenderer.setClearColor(
+  0x000000,
+  0
+);
+
+
+frontRenderer.setPixelRatio(
+  Math.min(
+    window.devicePixelRatio || 1,
+    2
+  )
+);
+
+
+frontRenderer.outputColorSpace =
+  THREE.SRGBColorSpace;
+
+
+frontThreeLayer.appendChild(
+  frontRenderer.domElement
+);
 
   const ambient =
     new THREE.AmbientLight(
@@ -2105,9 +2147,12 @@ async function startCamera() {
     threeLayer.style.display =
       "block";
 
-    effectOverlay.style.display =
+    frontThreeLayer.style.display =
       "block";
 
+    effectOverlay.style.display =
+      "block";
+  
     overlay.style.display =
       "block";
 
@@ -2278,8 +2323,14 @@ function stopStream() {
   threeLayer.style.display =
     "none";
 
+
+  frontThreeLayer.style.display =
+    "none";
+
+
   effectOverlay.style.display =
     "none";  
+
 
   overlay.style.display =
     "none";
@@ -2429,6 +2480,7 @@ function resizeThree() {
 
   if (
     !renderer ||
+    !frontRenderer ||
     !threeCamera
   ) {
 
@@ -2456,25 +2508,27 @@ function resizeThree() {
   );
 
 
+  frontRenderer.setSize(
+    rect.width,
+    rect.height,
+    false
+  );
+
+
   threeCamera.left =
     0;
-
 
   threeCamera.right =
     1;
 
-
   threeCamera.top =
     1;
-
 
   threeCamera.bottom =
     0;
 
-
   threeCamera.updateProjectionMatrix();
 }
-
 
 function clearOverlay() {
 
@@ -3361,15 +3415,80 @@ function buildHumanOcclusionLayer() {
   return true;
 }
 
+function modelNeedsHumanOcclusion(
+  instance
+) {
+
+  if (
+    !instance ||
+    !instance.config
+  ) {
+
+    return false;
+  }
+
+
+  const config =
+    normalizeModelConfig(
+      instance.config
+    );
+
+
+  if (
+    !effectIsEnabled(
+      config.id
+    )
+  ) {
+
+    return false;
+  }
+
+
+  if (
+    config.occlusion !==
+    "HUMAN"
+  ) {
+
+    return false;
+  }
+
+
+  switch (
+    config.behavior
+  ) {
+
+    case "ORBIT":
+
+      return (
+        orbitDepth < 0
+      );
+
+
+    default:
+
+      return false;
+  }
+}
 
 function shouldUseHumanOcclusion() {
 
-  return (
-    effectIsEnabled(
-      "butterfly"
-    ) &&
-    orbitDepth < 0
-  );
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    if (
+      modelNeedsHumanOcclusion(
+        instance
+      )
+    ) {
+
+      return true;
+    }
+  }
+
+
+  return false;
 }
 
 

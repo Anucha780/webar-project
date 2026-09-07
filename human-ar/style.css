@@ -73,7 +73,7 @@ a {
   background: #000;
 }
 
-#three-layer {
+#three-front-layer {
   display: none;
 
   position: absolute;
@@ -85,6 +85,14 @@ a {
 
   pointer-events: none;
 }
+
+#three-front-layer canvas {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+}
+
 
 #three-layer canvas {
   display: block;

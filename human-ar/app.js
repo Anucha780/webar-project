@@ -2530,6 +2530,7 @@ function resizeThree() {
   threeCamera.updateProjectionMatrix();
 }
 
+
 function clearOverlay() {
 
   ctx.clearRect(
@@ -4914,6 +4915,118 @@ async function capturePhoto() {
 }
 
 
+function renderModelLayers() {
+
+  if (
+    !renderer ||
+    !frontRenderer ||
+    !scene ||
+    !threeCamera
+  ) {
+
+    return;
+  }
+
+
+  const originalVisibility =
+    new Map();
+
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    originalVisibility.set(
+      instance.config.id,
+      instance.anchor.visible
+    );
+  }
+
+
+  // -----------------------------------------
+  // BACK PASS
+  // Human can occlude these models
+  // -----------------------------------------
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    const wasVisible =
+      originalVisibility.get(
+        instance.config.id
+      );
+
+
+    instance.anchor.visible =
+      Boolean(
+        wasVisible &&
+        modelNeedsHumanOcclusion(
+          instance
+        )
+      );
+  }
+
+
+  renderer.render(
+    scene,
+    threeCamera
+  );
+
+
+  // -----------------------------------------
+  // FRONT PASS
+  // These models stay above human cutout
+  // -----------------------------------------
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    const wasVisible =
+      originalVisibility.get(
+        instance.config.id
+      );
+
+
+    instance.anchor.visible =
+      Boolean(
+        wasVisible &&
+        !modelNeedsHumanOcclusion(
+          instance
+        )
+      );
+  }
+
+
+  frontRenderer.render(
+    scene,
+    threeCamera
+  );
+
+
+  // -----------------------------------------
+  // RESTORE REAL VISIBILITY
+  // -----------------------------------------
+
+  for (
+    const instance
+    of modelInstances.values()
+  ) {
+
+    instance.anchor.visible =
+      Boolean(
+        originalVisibility.get(
+          instance.config.id
+        )
+      );
+  }
+}
+
+
 /* =========================================================
    MAIN LOOP
 ========================================================= */
@@ -5061,10 +5174,7 @@ function predictPose() {
   }
 
 
-  renderer.render(
-    scene,
-    threeCamera
-  );
+  renderModelLayers();
 
 
   drawStarsEffect(

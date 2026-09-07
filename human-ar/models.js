@@ -17,6 +17,8 @@ export const MODEL_REGISTRY = [
 
   behavior: "ORBIT",
 
+  occlusion: "HUMAN",
+
   enabled: true,
 
   toggleable: true,
@@ -48,6 +50,8 @@ export const MODEL_REGISTRY = [
   path: "./models/waveboy.glb",
 
   behavior: "SHOULDER",
+
+  occlusion: "NONE",
 
   enabled: true,
 
@@ -85,11 +89,16 @@ export function normalizeModelConfig(
 
     ...model,
 
-     type:
-    model.type || "GLB",
+    type:
+  model.type || "GLB",
 
-  toggleable:
-    model.toggleable !== false,
+occlusion:
+  model.occlusion === "HUMAN"
+    ? "HUMAN"
+    : "NONE",
+
+toggleable:
+  model.toggleable !== false,
 
   ui: {
     label:

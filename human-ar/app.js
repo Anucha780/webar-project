@@ -89,6 +89,11 @@ const modelToggleElements =
    DEBUG UI
 ========================================================= */
 
+const systemStatus =
+  document.querySelector(
+    "#status"
+  );
+
 const cameraStatus =
   document.querySelector(
     "#camera-status"
@@ -96,12 +101,12 @@ const cameraStatus =
 
 const poseStatus =
   document.querySelector(
-    "#pose-status"
+    "#person-status"
   );
 
 const segmentationStatus =
   document.querySelector(
-    "#segmentation-status"
+    "#mediapipe-status"
   );
 
 const threeStatus =
@@ -111,7 +116,7 @@ const threeStatus =
 
 const modelStatus =
   document.querySelector(
-    "#model-status"
+    "#active-model-status"
   );
 
 const anchorStatus =
@@ -121,7 +126,7 @@ const anchorStatus =
 
 const effectStatus =
   document.querySelector(
-    "#effect-status"
+    "#behavior-status"
   );
 
 const captureStatus =
@@ -133,7 +138,6 @@ const errorStatus =
   document.querySelector(
     "#error-status"
   );
-
 
 /* =========================================================
    CAMERA STATE
@@ -5628,6 +5632,10 @@ window.addEventListener(
 
 function initializeUI() {
 
+  systemStatus.textContent =
+    "Loading...";
+
+
   cameraStatus.textContent =
     "Stopped";
 
@@ -5708,6 +5716,9 @@ function initializeUI() {
 async function initializeApplication() {
 
   try {
+
+    systemStatus.textContent =
+      "Ready";
 
     console.log(
       "[Human AR] M8.12B — Per-effect Layering + Orbit Transition"

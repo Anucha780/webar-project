@@ -1,3 +1,5 @@
+console.log("APP.JS STARTED");
+
 import {
   FilesetResolver,
   PoseLandmarker,
@@ -5408,3 +5410,412 @@ function capturePhoto() {
     );
   }
 }
+
+/* =========================================================
+   MODEL TOGGLE EVENTS
+========================================================= */
+
+function bindModelToggleEvents() {
+
+  for (
+    const [
+      modelId,
+      toggleElement
+    ]
+    of modelToggleElements.entries()
+  ) {
+
+    toggleElement.addEventListener(
+      "change",
+      () => {
+
+        handleModelToggle(
+          modelId,
+          toggleElement.checked
+        );
+      }
+    );
+  }
+}
+
+
+/* =========================================================
+   STARS TOGGLE
+========================================================= */
+
+function handleStarsToggle() {
+
+  enabledEffects.stars =
+    Boolean(
+      toggleStars.checked
+    );
+
+
+  if (
+    !enabledEffects.stars
+  ) {
+
+    clearEffectOverlay();
+  }
+
+
+  updateEffectDebug();
+}
+
+
+/* =========================================================
+   BUTTON EVENTS
+========================================================= */
+
+startButton.addEventListener(
+  "click",
+  async () => {
+
+    await startCamera();
+  }
+);
+
+
+stopButton.addEventListener(
+  "click",
+  () => {
+
+    stopStream();
+  }
+);
+
+
+switchButton.addEventListener(
+  "click",
+  async () => {
+
+    await switchCamera();
+  }
+);
+
+
+captureButton.addEventListener(
+  "click",
+  () => {
+
+    capturePhoto();
+  }
+);
+
+
+/* =========================================================
+   STAR EVENT
+========================================================= */
+
+if (
+  toggleStars
+) {
+
+  toggleStars.addEventListener(
+    "change",
+    handleStarsToggle
+  );
+}
+
+
+/* =========================================================
+   VIDEO EVENTS
+========================================================= */
+
+video.addEventListener(
+  "loadedmetadata",
+  () => {
+
+    resizeOverlay();
+
+    resizeThree();
+  }
+);
+
+
+/* =========================================================
+   WINDOW RESIZE
+========================================================= */
+
+window.addEventListener(
+  "resize",
+  () => {
+
+    resizeOverlay();
+
+    resizeThree();
+  }
+);
+
+
+/* =========================================================
+   ORIENTATION CHANGE
+========================================================= */
+
+window.addEventListener(
+  "orientationchange",
+  () => {
+
+    /*
+     * Mobile Safari can report the old viewport size
+     * immediately during orientationchange.
+     */
+
+    setTimeout(
+      () => {
+
+        resizeOverlay();
+
+        resizeThree();
+      },
+
+      250
+    );
+  }
+);
+
+
+/* =========================================================
+   PAGE VISIBILITY
+========================================================= */
+
+document.addEventListener(
+  "visibilitychange",
+  () => {
+
+    if (
+      document.hidden
+    ) {
+
+      /*
+       * Do not destroy the camera stream here.
+       * Just reset timing so returning to Safari
+       * does not create a huge animation delta.
+       */
+
+      lastFrameTimestamp =
+        performance.now();
+    }
+  }
+);
+
+
+/* =========================================================
+   BEFORE UNLOAD
+========================================================= */
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    stopMediaTracks();
+
+
+    if (
+      latestSegmentationMask &&
+      latestSegmentationMask.close
+    ) {
+
+      latestSegmentationMask.close();
+    }
+  }
+);
+
+
+/* =========================================================
+   INITIAL UI STATE
+========================================================= */
+
+function initializeUI() {
+
+  cameraStatus.textContent =
+    "Stopped";
+
+
+  poseStatus.textContent =
+    "Loading...";
+
+
+  segmentationStatus.textContent =
+    "Loading...";
+
+
+  threeStatus.textContent =
+    "Loading...";
+
+
+  modelStatus.textContent =
+    "Loading...";
+
+
+  anchorStatus.textContent =
+    "Hidden";
+
+
+  effectStatus.textContent =
+    "Loading...";
+
+
+  captureStatus.textContent =
+    "Ready";
+
+
+  errorStatus.textContent =
+    "None";
+
+
+  video.style.display =
+    "none";
+
+
+  threeLayer.style.display =
+    "none";
+
+
+  frontThreeLayer.style.display =
+    "none";
+
+
+  effectOverlay.style.display =
+    "none";
+
+
+  overlay.style.display =
+    "none";
+
+
+  startButton.disabled =
+    true;
+
+
+  stopButton.disabled =
+    true;
+
+
+  switchButton.disabled =
+    true;
+
+
+  captureButton.disabled =
+    true;
+}
+
+
+/* =========================================================
+   APPLICATION BOOT
+========================================================= */
+
+async function initializeApplication() {
+
+  try {
+
+    console.log(
+      "[Human AR] M8.12B — Per-effect Layering + Orbit Transition"
+    );
+
+
+    initializeUI();
+
+
+    /*
+     * Build the model checkboxes directly from MODEL_REGISTRY.
+     */
+
+    createModelToggles();
+
+
+    bindModelToggleEvents();
+
+
+    /*
+     * Stars remain a BODY_EFFECT rather than a GLB registry model.
+     */
+
+    initializeStars();
+
+
+    /*
+     * Three.js is synchronous.
+     * Both BACK and FRONT renderers are created here.
+     */
+
+    initializeThree();
+
+
+    /*
+     * MediaPipe and GLBs can load independently.
+     */
+
+    await Promise.all([
+
+      initializeMediaPipe(),
+
+      loadAllModels()
+    ]);
+
+
+    updateControls();
+
+
+    if (
+      systemReady()
+    ) {
+
+      threeStatus.textContent =
+        `Ready r${THREE.REVISION}`;
+
+
+      startButton.disabled =
+        false;
+
+
+      switchButton.disabled =
+        false;
+
+
+      captureStatus.textContent =
+        "Ready";
+
+
+      console.log(
+        "[Human AR] System Ready"
+      );
+
+    } else {
+
+      throw new Error(
+        "Human AR initialization incomplete"
+      );
+    }
+
+
+  } catch (
+  error
+  ) {
+
+    startButton.disabled =
+      true;
+
+
+    captureButton.disabled =
+      true;
+
+
+    setError(
+      error
+    );
+
+
+    console.error(
+      "[Human AR] Initialization failed:",
+      error
+    );
+  }
+}
+
+
+/* =========================================================
+   START APPLICATION
+========================================================= */
+
+initializeApplication();
